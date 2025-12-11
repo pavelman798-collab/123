@@ -14,6 +14,10 @@ theme: /
         intent!: /пока
         a: Пока пока
 
+    state: HelloWorld
+        q!: * (hello world|хелло ворлд|привет мир) *
+        a: Hello World! 🌍
+
     state: NoMatch
         event!: noMatch
         a: Я не понял. Вы сказали: {{$request.query}}
