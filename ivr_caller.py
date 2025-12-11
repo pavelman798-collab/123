@@ -32,6 +32,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.ini")
 CONNID_FILE = os.path.join(BASE_DIR, "connid.txt")
 LOG_FILE = os.path.join(BASE_DIR, "ivr_log.txt")
+HISTORY_FILE = os.path.join(BASE_DIR, "campaigns_history.json")
 # ===========================================
 
 
@@ -826,6 +827,10 @@ class IVRCallerApp:
         self.notebook.add(self.scenarios_frame, text="⚡ Быстрые сценарии")
         self.setup_scenarios_tab()
 
+        self.history_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.history_frame, text="📜 История")
+        self.setup_history_tab()
+
         # Статус-бар
         self.status_label = ttk.Label(
             self.root,
@@ -849,6 +854,9 @@ class IVRCallerApp:
                 value=key, variable=self.selected_alert_type
             ).grid(row=0, column=col_idx, padx=10, pady=5, sticky=tk.W)
             col_idx += 1
+
+        # Добавляем trace для отслеживания изменений типа оповещения
+        self.selected_alert_type.trace("w", self.toggle_text_fields)
 
         # Текстовые поля
         text_frame = ttk.LabelFrame(self.constructor_frame, text="Шаг 2: Содержимое сообщений", padding="10")
@@ -890,7 +898,7 @@ class IVRCallerApp:
 
         # Загрузка номеров из файла
         file_load_frame = ttk.LabelFrame(self.constructor_frame, text="Шаг 3: Загрузка номеров телефонов", padding="10")
-        file_load_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        file_load_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # Кнопки загрузки
         btn_frame = ttk.Frame(file_load_frame)
@@ -918,7 +926,7 @@ class IVRCallerApp:
 
         self.phones_listbox = tk.Listbox(
             list_frame, font=("Consolas", 10),
-            selectmode=tk.EXTENDED
+            selectmode=tk.EXTENDED, height=6
         )
         scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.phones_listbox.yview)
         self.phones_listbox.configure(yscrollcommand=scrollbar.set)
@@ -933,6 +941,85 @@ class IVRCallerApp:
             font=("Segoe UI", 9), foreground="gray"
         ).pack(anchor=tk.W, pady=(5, 0))
 
+        # Шаг 4: Параметры кампании
+        params_frame = ttk.LabelFrame(self.constructor_frame, text="Шаг 4: Параметры кампании", padding="10")
+        params_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        # Номер отправителя
+        sender_frame = ttk.Frame(params_frame)
+        sender_frame.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Label(
+            sender_frame,
+            text="Телефонный номер отправителя:",
+            font=("Segoe UI", 10)
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        self.sender_phone = tk.StringVar()
+        sender_entry = ttk.Entry(sender_frame, textvariable=self.sender_phone, width=20, font=("Consolas", 10))
+        sender_entry.pack(side=tk.LEFT)
+
+        self.sender_validation_label = ttk.Label(sender_frame, text="", font=("Segoe UI", 9), foreground="red")
+        self.sender_validation_label.pack(side=tk.LEFT, padx=(10, 0))
+
+        # Валидация номера отправителя
+        self.sender_phone.trace("w", self.validate_sender_phone)
+
+        ttk.Label(
+            params_frame,
+            text="💡 11 цифр, начинается с 7 (например: 79991234567)",
+            font=("Segoe UI", 9),
+            foreground="gray"
+        ).pack(anchor=tk.W, pady=(0, 10))
+
+        # Номер шаблона СМС
+        template_frame = ttk.Frame(params_frame)
+        template_frame.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Label(
+            template_frame,
+            text="Номер шаблона СМС:",
+            font=("Segoe UI", 10)
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        self.sms_template = tk.StringVar()
+        ttk.Entry(template_frame, textvariable=self.sms_template, width=20, font=("Consolas", 10)).pack(side=tk.LEFT)
+
+        # Отложенная отправка
+        delayed_frame = ttk.Frame(params_frame)
+        delayed_frame.pack(fill=tk.X, pady=(5, 0))
+
+        self.delayed_send = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            delayed_frame,
+            text="Отложенная отправка",
+            variable=self.delayed_send,
+            command=self.toggle_delayed_send
+        ).pack(side=tk.LEFT)
+
+        # Поля для даты и времени
+        datetime_frame = ttk.Frame(params_frame)
+        datetime_frame.pack(fill=tk.X, pady=(5, 0))
+
+        ttk.Label(datetime_frame, text="Дата:").pack(side=tk.LEFT, padx=(20, 5))
+        self.send_date = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
+        self.date_entry = ttk.Entry(datetime_frame, textvariable=self.send_date, width=12, font=("Consolas", 10))
+        self.date_entry.pack(side=tk.LEFT, padx=(0, 15))
+        self.date_entry.config(state='disabled')
+
+        ttk.Label(datetime_frame, text="Время:").pack(side=tk.LEFT, padx=(0, 5))
+        self.send_time = tk.StringVar(value="12:00")
+        self.time_entry = ttk.Entry(datetime_frame, textvariable=self.send_time, width=8, font=("Consolas", 10))
+        self.time_entry.pack(side=tk.LEFT)
+        self.time_entry.config(state='disabled')
+
+        ttk.Label(
+            params_frame,
+            text="💡 Формат даты: ГГГГ-ММ-ДД, времени: ЧЧ:ММ",
+            font=("Segoe UI", 9),
+            foreground="gray"
+        ).pack(anchor=tk.W, pady=(5, 0))
+
         # Нижняя панель - кнопка отправки
         bottom_frame = ttk.Frame(self.constructor_frame)
         bottom_frame.pack(fill=tk.X, padx=10, pady=10)
@@ -941,6 +1028,176 @@ class IVRCallerApp:
             bottom_frame, text="🚀 Отправить оповещения",
             command=self.send_constructor_alerts
         ).pack(side=tk.RIGHT, ipady=5, ipadx=20)
+
+        # Инициализируем состояние полей
+        self.toggle_text_fields()
+
+    def toggle_text_fields(self, *args):
+        """Включение/выключение текстовых полей в зависимости от типа оповещения"""
+        alert_type = self.selected_alert_type.get()
+
+        if alert_type == "call":
+            # Позвонить - только поле озвучивания
+            self.voice_text.config(state='normal', bg='white')
+            self.sms_text.config(state='disabled', bg='#f0f0f0')
+        elif alert_type == "sms":
+            # Отправить СМС - только поле СМС
+            self.voice_text.config(state='disabled', bg='#f0f0f0')
+            self.sms_text.config(state='normal', bg='white')
+        elif alert_type == "call_sms":
+            # Позвонить и отправить СМС - оба поля
+            self.voice_text.config(state='normal', bg='white')
+            self.sms_text.config(state='normal', bg='white')
+
+    def validate_sender_phone(self, *args):
+        """Валидация номера отправителя"""
+        phone = self.sender_phone.get()
+
+        if not phone:
+            self.sender_validation_label.config(text="")
+            return
+
+        # Проверка: только цифры
+        if not phone.isdigit():
+            self.sender_validation_label.config(text="❌ Только цифры", foreground="red")
+            return
+
+        # Проверка: 11 цифр
+        if len(phone) != 11:
+            self.sender_validation_label.config(text=f"❌ {len(phone)}/11 цифр", foreground="orange")
+            return
+
+        # Проверка: начинается с 7
+        if not phone.startswith('7'):
+            self.sender_validation_label.config(text="❌ Должен начинаться с 7", foreground="red")
+            return
+
+        # Всё ок
+        self.sender_validation_label.config(text="✅ OK", foreground="green")
+
+    def toggle_delayed_send(self):
+        """Включение/выключение полей даты и времени"""
+        if self.delayed_send.get():
+            self.date_entry.config(state='normal')
+            self.time_entry.config(state='normal')
+        else:
+            self.date_entry.config(state='disabled')
+            self.time_entry.config(state='disabled')
+
+    def setup_history_tab(self):
+        """Вкладка истории кампаний"""
+        # Заголовок
+        ttk.Label(
+            self.history_frame,
+            text="История запуска кампаний",
+            font=("Segoe UI", 12, "bold")
+        ).pack(pady=(10, 5))
+
+        # Кнопка обновления
+        btn_frame = ttk.Frame(self.history_frame)
+        btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        ttk.Button(
+            btn_frame, text="🔄 Обновить",
+            command=self.refresh_history, width=12
+        ).pack(side=tk.RIGHT)
+
+        # Таблица (Treeview)
+        tree_frame = ttk.Frame(self.history_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Treeview
+        columns = ("status", "date", "type", "phones", "success", "fail")
+        self.history_tree = ttk.Treeview(
+            tree_frame,
+            columns=columns,
+            show="headings",
+            yscrollcommand=scrollbar.set,
+            height=15
+        )
+        scrollbar.config(command=self.history_tree.yview)
+
+        # Заголовки колонок
+        self.history_tree.heading("status", text="Статус")
+        self.history_tree.heading("date", text="Дата и время")
+        self.history_tree.heading("type", text="Тип")
+        self.history_tree.heading("phones", text="Всего номеров")
+        self.history_tree.heading("success", text="Успешно")
+        self.history_tree.heading("fail", text="Ошибок")
+
+        # Ширина колонок
+        self.history_tree.column("status", width=100, anchor=tk.CENTER)
+        self.history_tree.column("date", width=180, anchor=tk.CENTER)
+        self.history_tree.column("type", width=200, anchor=tk.W)
+        self.history_tree.column("phones", width=120, anchor=tk.CENTER)
+        self.history_tree.column("success", width=100, anchor=tk.CENTER)
+        self.history_tree.column("fail", width=100, anchor=tk.CENTER)
+
+        self.history_tree.pack(fill=tk.BOTH, expand=True)
+
+        # Загружаем историю
+        self.refresh_history()
+
+    def load_history(self):
+        """Загрузка истории из файла"""
+        if not os.path.exists(HISTORY_FILE):
+            return []
+
+        try:
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Ошибка загрузки истории: {e}")
+            return []
+
+    def save_history(self, history):
+        """Сохранение истории в файл"""
+        try:
+            with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+                json.dump(history, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Ошибка сохранения истории: {e}")
+
+    def add_campaign_to_history(self, campaign_data):
+        """Добавление кампании в историю"""
+        history = self.load_history()
+        history.append(campaign_data)
+        self.save_history(history)
+        self.refresh_history()
+
+    def refresh_history(self):
+        """Обновление отображения истории"""
+        # Очищаем таблицу
+        for item in self.history_tree.get_children():
+            self.history_tree.delete(item)
+
+        # Загружаем историю
+        history = self.load_history()
+
+        # Сортируем по дате (новые сверху)
+        history.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+        # Заполняем таблицу
+        for campaign in history:
+            status_icon = "✅ Запущено" if campaign.get('launched', False) else "❌ Не запущено"
+            date_str = campaign.get('date', '')
+            alert_type = campaign.get('alert_type', '')
+            total = campaign.get('total', 0)
+            success = campaign.get('success', 0)
+            fail = campaign.get('fail', 0)
+
+            self.history_tree.insert("", "end", values=(
+                status_icon,
+                date_str,
+                alert_type,
+                total,
+                success,
+                fail
+            ))
 
     def setup_scenarios_tab(self):
         ttk.Label(
@@ -1201,6 +1458,19 @@ class IVRCallerApp:
 
         progress.destroy()
         self.status_label.config(text=f"CONNID: {self.current_connid} | ✅{success} ❌{fail}")
+
+        # Сохраняем в историю
+        campaign_data = {
+            "timestamp": datetime.now().isoformat(),
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "alert_type": alert_type["name"],
+            "source": source,
+            "total": len(employees),
+            "success": success,
+            "fail": fail,
+            "launched": True
+        }
+        self.add_campaign_to_history(campaign_data)
 
         if fail == 0:
             messagebox.showinfo("Успех", f"Отправлено: {success}")
