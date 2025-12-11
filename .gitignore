@@ -24,6 +24,7 @@ wheels/
 config.ini
 connid.txt
 ivr_log.txt
+campaigns_history.json
 
 # IDE
 .vscode/
