@@ -37,26 +37,6 @@ LOG_FILE = os.path.join(BASE_DIR, "ivr_log.txt")
 
 # ============== ТИПЫ ОПОВЕЩЕНИЙ ==============
 ALERT_TYPES = {
-    "sboy": {
-        "name": "🔴 Оповестить о сбое",
-        "service": "MONITOR_BANK",
-        "monitor_bank_id": "1"
-    },
-    "metrika": {
-        "name": "📊 Оповестить о метрике",
-        "service": "MONITOR_BANK",
-        "monitor_bank_id": "2"
-    },
-    "tech_work": {
-        "name": "🔧 Тех. работы",
-        "service": "MONITOR_BANK",
-        "monitor_bank_id": "3"
-    },
-    "security": {
-        "name": "🔒 Безопасность",
-        "service": "MONITOR_BANK",
-        "monitor_bank_id": "4"
-    },
     "call": {
         "name": "📞 Позвонить",
         "service": "MONITOR_BANK",
@@ -64,6 +44,11 @@ ALERT_TYPES = {
     },
     "call_sms": {
         "name": "📞📱 Позвонить и отправить СМС",
+        "service": "MONITOR_BANK",
+        "monitor_bank_id": "1"
+    },
+    "sms": {
+        "name": "📱 Отправить СМС",
         "service": "MONITOR_BANK",
         "monitor_bank_id": "1"
     },
@@ -775,7 +760,7 @@ class IVRCallerApp:
 
         # UI переменные
         self.employee_vars = {}
-        self.selected_alert_type = tk.StringVar(value="sboy")
+        self.selected_alert_type = tk.StringVar(value="call")
 
         self.setup_ui()
         self.center_window()
@@ -841,11 +826,6 @@ class IVRCallerApp:
         self.notebook.add(self.scenarios_frame, text="⚡ Быстрые сценарии")
         self.setup_scenarios_tab()
 
-        # Вкладка Загрузка из файла
-        self.file_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.file_frame, text="📄 Из файла")
-        self.setup_file_tab()
-
         # Статус-бар
         self.status_label = ttk.Label(
             self.root,
@@ -855,123 +835,112 @@ class IVRCallerApp:
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 10))
 
     def setup_constructor_tab(self):
+        # Инициализация списка номеров
+        self.file_phones = []
+
         # Тип оповещения
-        alert_frame = ttk.LabelFrame(self.constructor_frame, text="Тип оповещения", padding="10")
+        alert_frame = ttk.LabelFrame(self.constructor_frame, text="Шаг 1: Тип оповещения", padding="10")
         alert_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
 
-        # Разбиваем на 2 ряда для удобства (6 типов)
-        row_idx = 0
         col_idx = 0
-        max_cols = 3
-
         for key, alert in ALERT_TYPES.items():
             ttk.Radiobutton(
                 alert_frame, text=alert["name"],
                 value=key, variable=self.selected_alert_type
-            ).grid(row=row_idx, column=col_idx, padx=10, pady=5, sticky=tk.W)
-
+            ).grid(row=0, column=col_idx, padx=10, pady=5, sticky=tk.W)
             col_idx += 1
-            if col_idx >= max_cols:
-                col_idx = 0
-                row_idx += 1
 
-        # Список сотрудников
-        employees_frame = ttk.LabelFrame(self.constructor_frame, text="Выбор сотрудников", padding="10")
-        employees_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        # Текстовые поля
+        text_frame = ttk.LabelFrame(self.constructor_frame, text="Шаг 2: Содержимое сообщений", padding="10")
+        text_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        # Поиск
-        search_frame = ttk.Frame(employees_frame)
-        search_frame.pack(fill=tk.X, pady=(0, 10))
+        # Поле для озвучивания
+        ttk.Label(
+            text_frame,
+            text="📞 Текст для озвучивания при звонке:",
+            font=("Segoe UI", 10, "bold")
+        ).pack(anchor=tk.W, pady=(5, 2))
 
-        ttk.Label(search_frame, text="🔍 Поиск:").pack(side=tk.LEFT)
+        ttk.Label(
+            text_frame,
+            text="💡 Этот текст будет произнесён роботом при звонке получателю",
+            font=("Segoe UI", 9),
+            foreground="gray"
+        ).pack(anchor=tk.W, pady=(0, 5))
 
-        self.search_var = tk.StringVar()
-        self.search_var.trace("w", self.filter_employees)
-        ttk.Entry(search_frame, textvariable=self.search_var, width=30).pack(side=tk.LEFT, padx=(5, 10))
+        self.voice_text = tk.Text(text_frame, height=4, font=("Segoe UI", 10), wrap=tk.WORD)
+        self.voice_text.pack(fill=tk.X, pady=(0, 15))
 
-        ttk.Button(search_frame, text="Выбрать всех", command=self.select_all, width=15).pack(side=tk.LEFT, padx=2)
-        ttk.Button(search_frame, text="Снять выбор", command=self.deselect_all, width=15).pack(side=tk.LEFT, padx=2)
+        # Поле для СМС
+        ttk.Label(
+            text_frame,
+            text="📱 Текст для СМС:",
+            font=("Segoe UI", 10, "bold")
+        ).pack(anchor=tk.W, pady=(5, 2))
 
-        # Список с прокруткой
-        list_container = ttk.Frame(employees_frame)
-        list_container.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(
+            text_frame,
+            text="💡 Этот текст будет отправлен в виде SMS-сообщения",
+            font=("Segoe UI", 9),
+            foreground="gray"
+        ).pack(anchor=tk.W, pady=(0, 5))
 
-        self.canvas = tk.Canvas(list_container, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(list_container, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.sms_text = tk.Text(text_frame, height=4, font=("Segoe UI", 10), wrap=tk.WORD)
+        self.sms_text.pack(fill=tk.X)
 
-        self.employees_list_frame = ttk.Frame(self.canvas)
-        self.canvas.configure(yscrollcommand=scrollbar.set)
+        # Загрузка номеров из файла
+        file_load_frame = ttk.LabelFrame(self.constructor_frame, text="Шаг 3: Загрузка номеров телефонов", padding="10")
+        file_load_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        # Кнопки загрузки
+        btn_frame = ttk.Frame(file_load_frame)
+        btn_frame.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Button(
+            btn_frame, text="📂 Выбрать TXT файл",
+            command=self.load_phones_from_file, width=20
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Button(
+            btn_frame, text="🗑️ Очистить список",
+            command=self.clear_file_phones, width=15
+        ).pack(side=tk.LEFT)
+
+        self.file_count_label = ttk.Label(
+            btn_frame, text="Загружено: 0 номеров",
+            font=("Segoe UI", 10, "bold")
+        )
+        self.file_count_label.pack(side=tk.RIGHT)
+
+        # Список номеров
+        list_frame = ttk.Frame(file_load_frame)
+        list_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.phones_listbox = tk.Listbox(
+            list_frame, font=("Consolas", 10),
+            selectmode=tk.EXTENDED
+        )
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.phones_listbox.yview)
+        self.phones_listbox.configure(yscrollcommand=scrollbar.set)
 
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.phones_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.canvas_window = self.canvas.create_window((0, 0), window=self.employees_list_frame, anchor=tk.NW)
+        # Подсказка
+        ttk.Label(
+            file_load_frame,
+            text="💡 Формат файла: один номер на строку (+79991234567)",
+            font=("Segoe UI", 9), foreground="gray"
+        ).pack(anchor=tk.W, pady=(5, 0))
 
-        self.employees_list_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(self.canvas_window, width=e.width))
-        self.canvas.bind_all("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
-
-        self.populate_employees_list()
-
-        # Нижняя панель
+        # Нижняя панель - кнопка отправки
         bottom_frame = ttk.Frame(self.constructor_frame)
         bottom_frame.pack(fill=tk.X, padx=10, pady=10)
-
-        self.selected_count_label = ttk.Label(bottom_frame, text="Выбрано: 0", font=("Segoe UI", 10, "bold"))
-        self.selected_count_label.pack(side=tk.LEFT)
 
         ttk.Button(
             bottom_frame, text="🚀 Отправить оповещения",
             command=self.send_constructor_alerts
         ).pack(side=tk.RIGHT, ipady=5, ipadx=20)
-
-    def populate_employees_list(self, filter_text=""):
-        for widget in self.employees_list_frame.winfo_children():
-            widget.destroy()
-
-        filter_text = filter_text.lower()
-
-        for emp_id, emp in self.employees.items():
-            if filter_text:
-                searchable = f"{emp['name']} {emp['phone']}".lower()
-                if filter_text not in searchable:
-                    continue
-
-            if emp_id not in self.employee_vars:
-                self.employee_vars[emp_id] = tk.BooleanVar(value=False)
-
-            emp_frame = ttk.Frame(self.employees_list_frame)
-            emp_frame.pack(fill=tk.X, pady=2)
-
-            ttk.Checkbutton(
-                emp_frame, variable=self.employee_vars[emp_id],
-                command=self.update_selected_count
-            ).pack(side=tk.LEFT, padx=(5, 10))
-
-            info_frame = ttk.Frame(emp_frame)
-            info_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-            ttk.Label(info_frame, text=emp["name"], font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
-            ttk.Label(info_frame, text=f"ID: {emp_id} • {emp['phone']}", font=("Segoe UI", 9), foreground="gray").pack(anchor=tk.W)
-
-            ttk.Separator(self.employees_list_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=2)
-
-    def filter_employees(self, *args):
-        self.populate_employees_list(self.search_var.get())
-
-    def select_all(self):
-        for var in self.employee_vars.values():
-            var.set(True)
-        self.update_selected_count()
-
-    def deselect_all(self):
-        for var in self.employee_vars.values():
-            var.set(False)
-        self.update_selected_count()
-
-    def update_selected_count(self):
-        count = sum(1 for v in self.employee_vars.values() if v.get())
-        self.selected_count_label.config(text=f"Выбрано: {count}")
 
     def setup_scenarios_tab(self):
         ttk.Label(
@@ -1020,87 +989,6 @@ class IVRCallerApp:
         tile.bind("<Button-1>", lambda e, sid=scenario_id: self.run_scenario(sid))
 
         return tile
-
-    def setup_file_tab(self):
-        """Вкладка загрузки номеров из файла"""
-        # Список загруженных номеров
-        self.file_phones = []
-
-        # Верхняя часть — выбор типа оповещения
-        alert_frame = ttk.LabelFrame(self.file_frame, text="Тип оповещения", padding="10")
-        alert_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
-
-        self.file_alert_type = tk.StringVar(value="sboy")
-
-        # Разбиваем на 2 ряда (6 типов)
-        row_idx = 0
-        col_idx = 0
-        max_cols = 3
-
-        for key, alert in ALERT_TYPES.items():
-            ttk.Radiobutton(
-                alert_frame, text=alert["name"],
-                value=key, variable=self.file_alert_type
-            ).grid(row=row_idx, column=col_idx, padx=10, pady=5, sticky=tk.W)
-
-            col_idx += 1
-            if col_idx >= max_cols:
-                col_idx = 0
-                row_idx += 1
-
-        # Средняя часть — загрузка файла и список номеров
-        file_load_frame = ttk.LabelFrame(self.file_frame, text="Загрузка номеров", padding="10")
-        file_load_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-
-        # Кнопки загрузки
-        btn_frame = ttk.Frame(file_load_frame)
-        btn_frame.pack(fill=tk.X, pady=(0, 10))
-
-        ttk.Button(
-            btn_frame, text="📂 Выбрать TXT файл",
-            command=self.load_phones_from_file, width=20
-        ).pack(side=tk.LEFT, padx=(0, 10))
-
-        ttk.Button(
-            btn_frame, text="🗑️ Очистить список",
-            command=self.clear_file_phones, width=15
-        ).pack(side=tk.LEFT)
-
-        self.file_count_label = ttk.Label(
-            btn_frame, text="Загружено: 0 номеров",
-            font=("Segoe UI", 10)
-        )
-        self.file_count_label.pack(side=tk.RIGHT)
-
-        # Список номеров
-        list_frame = ttk.Frame(file_load_frame)
-        list_frame.pack(fill=tk.BOTH, expand=True)
-
-        self.phones_listbox = tk.Listbox(
-            list_frame, font=("Consolas", 11),
-            selectmode=tk.EXTENDED
-        )
-        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.phones_listbox.yview)
-        self.phones_listbox.configure(yscrollcommand=scrollbar.set)
-
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.phones_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Подсказка
-        ttk.Label(
-            file_load_frame,
-            text="💡 Формат файла: один номер на строку (+79991234567)",
-            font=("Segoe UI", 9), foreground="gray"
-        ).pack(anchor=tk.W, pady=(5, 0))
-
-        # Нижняя часть — кнопка отправки
-        bottom_frame = ttk.Frame(self.file_frame)
-        bottom_frame.pack(fill=tk.X, padx=10, pady=10)
-
-        ttk.Button(
-            bottom_frame, text="🚀 Отправить оповещения",
-            command=self.send_file_alerts
-        ).pack(side=tk.RIGHT, ipady=5, ipadx=20)
 
     def load_phones_from_file(self):
         """Загрузка номеров из TXT файла"""
@@ -1181,32 +1069,6 @@ class IVRCallerApp:
         self.file_phones = []
         self._update_phones_listbox()
 
-    def send_file_alerts(self):
-        """Отправка оповещений по номерам из файла"""
-        if not self.file_phones:
-            messagebox.showwarning("Внимание", "Список номеров пуст!\n\nЗагрузите номера из TXT файла.")
-            return
-
-        alert_type = ALERT_TYPES[self.file_alert_type.get()]
-
-        # Формируем список для отправки
-        employees_to_call = []
-        for i, phone in enumerate(self.file_phones):
-            employees_to_call.append({
-                "id": f"file_{i}",
-                "name": f"Номер {phone}",
-                "phone": phone
-            })
-
-        # Подтверждение
-        if messagebox.askyesno(
-            "Подтверждение",
-            f"Тип: {alert_type['name']}\n\n"
-            f"Количество номеров: {len(employees_to_call)}\n\n"
-            f"Отправить оповещения?"
-        ):
-            self.send_alerts(employees_to_call, alert_type, "Из файла")
-
     def refresh_employees(self):
         # Создаём окно с логом
         log_window = tk.Toplevel(self.root)
@@ -1269,20 +1131,45 @@ class IVRCallerApp:
             self.send_alerts(employees_to_call, ALERT_TYPES[scenario["alert_type"]], scenario["name"])
 
     def send_constructor_alerts(self):
-        employees_to_call = []
-        for emp_id, var in self.employee_vars.items():
-            if var.get() and emp_id in self.employees:
-                emp = self.employees[emp_id]
-                employees_to_call.append({"id": emp_id, "name": emp["name"], "phone": emp["phone"]})
+        # Проверка загруженных номеров
+        if not self.file_phones:
+            messagebox.showwarning("Внимание", "Список номеров пуст!\n\nЗагрузите номера из TXT файла.")
+            return
 
-        if not employees_to_call:
-            messagebox.showwarning("Внимание", "Выберите сотрудников!")
+        # Получение текстов
+        voice_text = self.voice_text.get("1.0", tk.END).strip()
+        sms_text = self.sms_text.get("1.0", tk.END).strip()
+
+        # Проверка что хоть один текст заполнен
+        if not voice_text and not sms_text:
+            messagebox.showwarning("Внимание", "Заполните хотя бы одно текстовое поле!\n\n(Текст для озвучивания или текст для СМС)")
             return
 
         alert_type = ALERT_TYPES[self.selected_alert_type.get()]
-        emp_list = "\n".join([f"  • {e['name']}" for e in employees_to_call])
 
-        if messagebox.askyesno("Подтверждение", f"Тип: {alert_type['name']}\n\nБудут оповещены:\n{emp_list}\n\nОтправить?"):
+        # Формируем список для отправки
+        employees_to_call = []
+        for i, phone in enumerate(self.file_phones):
+            employees_to_call.append({
+                "id": f"file_{i}",
+                "name": f"Номер {phone}",
+                "phone": phone
+            })
+
+        # Подготовка текста для подтверждения
+        confirm_text = f"Тип: {alert_type['name']}\n\n"
+        confirm_text += f"Количество номеров: {len(employees_to_call)}\n\n"
+
+        if voice_text:
+            confirm_text += f"📞 Текст для озвучивания:\n{voice_text[:100]}{'...' if len(voice_text) > 100 else ''}\n\n"
+
+        if sms_text:
+            confirm_text += f"📱 Текст СМС:\n{sms_text[:100]}{'...' if len(sms_text) > 100 else ''}\n\n"
+
+        confirm_text += "Отправить оповещения?"
+
+        # Подтверждение
+        if messagebox.askyesno("Подтверждение", confirm_text):
             self.send_alerts(employees_to_call, alert_type, "Конструктор")
 
     def send_alerts(self, employees, alert_type, source):
