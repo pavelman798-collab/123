@@ -1499,15 +1499,25 @@ class IVRCallerApp:
 
                 phones_data = campaign.get('phones_data', [])
                 for i, phone_info in enumerate(phones_data, 1):
-                    f.write(f"{i}. Номер: {phone_info.get('number', 'Не указан')}\n")
-                    f.write(f"   Часовой пояс: UTC{phone_info.get('timezone', '+0')}\n")
+                    f.write(f"\n{'-' * 80}\n")
+                    f.write(f"ЗАПРОС #{i}\n")
+                    f.write(f"{'-' * 80}\n\n")
 
-                    # Если есть информация о запросе
+                    f.write(f"Номер: {phone_info.get('number', 'Не указан')}\n")
+                    f.write(f"Часовой пояс: UTC{phone_info.get('timezone', '+0')}\n\n")
+
+                    # Выводим полный JSON запроса
                     request_info = phone_info.get('request_info', {})
                     if request_info:
-                        f.write(f"   URL: {request_info.get('url', 'Не указан')}\n")
-                        f.write(f"   Параметры: {request_info.get('params', 'Не указаны')}\n")
-                        f.write(f"   Статус: {request_info.get('status', 'Не указан')}\n")
+                        f.write(f"URL: {request_info.get('url', 'Не указан')}\n")
+                        f.write(f"Статус: {request_info.get('status', 'Не указан')}\n\n")
+
+                        # Полный JSON запроса в читаемом формате
+                        request_json = request_info.get('request_json', {})
+                        if request_json:
+                            f.write("JSON ЗАПРОСА:\n")
+                            f.write(json.dumps(request_json, ensure_ascii=False, indent=4))
+                            f.write("\n")
 
                     f.write("\n")
 
@@ -1933,7 +1943,7 @@ class IVRCallerApp:
                     alert_type_key = key
                     break
 
-            request_result = self.send_single_request(
+            request_result, request_data = self.send_single_request(
                 phone=emp["phone"],
                 timezone=timezone,
                 voice_text=voice_text,
@@ -1941,11 +1951,11 @@ class IVRCallerApp:
                 alert_type_key=alert_type_key or 'call'
             )
 
-            # Логируем информацию о запросе
+            # Логируем информацию о запросе с полным JSON
             request_info = {
                 "url": self.config.api_url,
-                "params": f"ANI={emp['phone']}, TZ_DBID={timezone}, SERVICE=IVR_Quality_Control",
-                "status": "success" if request_result else "failed"
+                "status": "success" if request_result else "failed",
+                "request_json": request_data  # Полный JSON запроса
             }
 
             # Обновляем phone_data с информацией о запросе
@@ -1996,6 +2006,9 @@ class IVRCallerApp:
             voice_text: Текст для озвучивания
             sender_phone: Номер отправителя (CPD)
             alert_type_key: Тип оповещения ("call", "call_sms", "sms")
+
+        Returns:
+            tuple: (success: bool, request_data: dict) - результат и данные запроса
         """
         try:
             import uuid as uuid_module
@@ -2047,11 +2060,12 @@ class IVRCallerApp:
 
             self.current_connid += 1
             self._save_connid()
-            return True
+            return (True, data)
 
         except Exception as e:
             print(f"Ошибка: {phone} - {e}")
-            return False
+            # Возвращаем данные запроса даже при ошибке
+            return (False, data if 'data' in locals() else {})
 
     def on_closing(self):
         self.data_loader.disconnect()
