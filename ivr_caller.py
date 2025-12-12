@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-IVR Caller v4 — приложение для оповещения по IVR
+Outbound Manager — приложение для управления исходящими звонками и SMS
 С загрузкой сотрудников из PostgreSQL или PHP-страницы
 """
 
@@ -58,39 +58,6 @@ ALERT_TYPES = {
 
 
 # ============== БЫСТРЫЕ СЦЕНАРИИ ==============
-QUICK_SCENARIOS = {
-    "critical_sboy": {
-        "name": "🔴 Критичный сбой",
-        "description": "Руководство + IT",
-        "color": "#e74c3c",
-        "alert_type": "sboy",
-        "employee_ids": [531, 533, 534]  # ID из БД/PHP
-    },
-    "daily_metrics": {
-        "name": "📊 Ежедневные метрики",
-        "description": "Аналитики",
-        "color": "#3498db",
-        "alert_type": "metrika",
-        "employee_ids": [535, 536]
-    },
-    "tech_maintenance": {
-        "name": "🔧 Плановые работы",
-        "description": "IT-отдел полностью",
-        "color": "#f39c12",
-        "alert_type": "tech_work",
-        "employee_ids": [531, 533, 537, 538]
-    },
-    "security_alert": {
-        "name": "🔒 Инцидент ИБ",
-        "description": "Безопасность + Рук-во",
-        "color": "#9b59b6",
-        "alert_type": "security",
-        "employee_ids": [539, 540, 531]
-    },
-}
-# =============================================
-
-
 # ============== ТЕСТОВЫЕ ДАННЫЕ ==============
 FALLBACK_EMPLOYEES = {
     531: {"name": "Горбачев Иван Геннадиевич", "phone": "+79991111111"},
@@ -132,7 +99,7 @@ class Config:
             'employees_url': '/admin/people.php',
             'username': 'admin', 'password': 'password'
         }
-        self.config['api'] = {'url': 'https://your-api/call'}
+        self.config['api'] = {'url': 'http://172.16.152.67:80/fm2/UDB/IVR_ADD_CALL_EXP'}
         self.config['settings'] = {
             'data_source': 'auto', 'db_timeout': '10',
             'api_timeout': '30', 'php_timeout': '30', 'verify_ssl': 'false'
@@ -180,6 +147,20 @@ class Config:
     @property
     def verify_ssl(self):
         return self.config.getboolean('settings', 'verify_ssl', fallback=False)
+
+    def get(self, key, default=''):
+        """Получить значение из секции auth"""
+        if not self.config.has_section('auth'):
+            return default
+        return self.config.get('auth', key, fallback=default)
+
+    def set(self, key, value):
+        """Установить значение в секцию auth"""
+        if not self.config.has_section('auth'):
+            self.config.add_section('auth')
+        self.config.set('auth', key, value)
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            self.config.write(f)
 
 
 class DatabaseManager:
@@ -736,12 +717,145 @@ class DataLoader:
         self.db.disconnect()
 
 
-class IVRCallerApp:
-    """Основное приложение"""
+class LoginWindow:
+    """Окно авторизации"""
 
     def __init__(self, root):
         self.root = root
-        self.root.title("📞 IVR Оповещения v4")
+        self.root.title("🔐 Авторизация - Outbound Manager")
+        self.root.geometry("400x300")
+        self.root.resizable(False, False)
+
+        # Центрируем окно
+        self.root.eval('tk::PlaceWindow . center')
+
+        # Результат авторизации
+        self.authenticated = False
+        self.username = None
+        self.password = None
+
+        # Создаем UI
+        self.create_widgets()
+
+        # Загружаем сохраненные учетные данные
+        self.load_credentials()
+
+    def create_widgets(self):
+        """Создание элементов интерфейса"""
+        # Заголовок
+        title_frame = ttk.Frame(self.root)
+        title_frame.pack(pady=(30, 20))
+
+        ttk.Label(
+            title_frame,
+            text="🔐 Вход в систему",
+            font=("Segoe UI", 16, "bold")
+        ).pack()
+
+        ttk.Label(
+            title_frame,
+            text="Outbound Manager v5",
+            font=("Segoe UI", 10),
+            foreground="gray"
+        ).pack(pady=(5, 0))
+
+        # Поля ввода
+        form_frame = ttk.Frame(self.root)
+        form_frame.pack(pady=20, padx=40, fill=tk.X)
+
+        # Логин
+        ttk.Label(form_frame, text="Логин:", font=("Segoe UI", 10)).pack(anchor=tk.W, pady=(0, 5))
+        self.username_var = tk.StringVar()
+        self.username_entry = ttk.Entry(form_frame, textvariable=self.username_var, font=("Segoe UI", 10))
+        self.username_entry.pack(fill=tk.X, pady=(0, 15))
+
+        # Пароль
+        ttk.Label(form_frame, text="Пароль:", font=("Segoe UI", 10)).pack(anchor=tk.W, pady=(0, 5))
+        self.password_var = tk.StringVar()
+        self.password_entry = ttk.Entry(form_frame, textvariable=self.password_var, font=("Segoe UI", 10), show="●")
+        self.password_entry.pack(fill=tk.X, pady=(0, 10))
+
+        # Чекбокс "Запомнить"
+        self.remember_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            form_frame,
+            text="Запомнить учетные данные",
+            variable=self.remember_var
+        ).pack(anchor=tk.W, pady=(5, 0))
+
+        # Кнопка входа
+        btn_frame = ttk.Frame(self.root)
+        btn_frame.pack(pady=20)
+
+        ttk.Button(
+            btn_frame,
+            text="Войти",
+            command=self.login,
+            width=20
+        ).pack()
+
+        # Статус
+        self.status_label = ttk.Label(self.root, text="", font=("Segoe UI", 9), foreground="red")
+        self.status_label.pack()
+
+        # Привязываем Enter к кнопке входа
+        self.password_entry.bind('<Return>', lambda e: self.login())
+        self.username_entry.bind('<Return>', lambda e: self.password_entry.focus())
+
+        # Фокус на поле логина
+        self.username_entry.focus()
+
+    def load_credentials(self):
+        """Загрузка сохраненных учетных данных"""
+        config = Config(CONFIG_FILE)
+        username = config.get('username', '')
+        password = config.get('password', '')
+
+        if username:
+            self.username_var.set(username)
+        if password:
+            self.password_var.set(password)
+            self.password_entry.focus()
+
+    def save_credentials(self):
+        """Сохранение учетных данных"""
+        if self.remember_var.get():
+            config = Config(CONFIG_FILE)
+            config.set('username', self.username)
+            config.set('password', self.password)
+        else:
+            # Очищаем сохраненные данные
+            config = Config(CONFIG_FILE)
+            config.set('username', '')
+            config.set('password', '')
+
+    def login(self):
+        """Обработка входа"""
+        username = self.username_var.get().strip()
+        password = self.password_var.get().strip()
+
+        if not username or not password:
+            self.status_label.config(text="Заполните все поля!")
+            return
+
+        # Здесь можно добавить реальную проверку учетных данных
+        # Пока что принимаем любые непустые значения
+        if len(username) >= 3 and len(password) >= 3:
+            self.authenticated = True
+            self.username = username
+            self.password = password
+            self.save_credentials()
+            self.root.destroy()
+        else:
+            self.status_label.config(text="Логин и пароль должны быть минимум 3 символа!")
+
+
+class IVRCallerApp:
+    """Основное приложение"""
+
+    def __init__(self, root, username=None):
+        self.root = root
+        self.root.title("📞 Outbound Manager")
         self.root.geometry("750x650")
         self.root.resizable(True, True)
         self.root.minsize(650, 550)
@@ -822,10 +936,6 @@ class IVRCallerApp:
         self.constructor_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.constructor_frame, text="📝 Конструктор")
         self.setup_constructor_tab()
-
-        self.scenarios_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.scenarios_frame, text="⚡ Быстрые сценарии")
-        self.setup_scenarios_tab()
 
         self.history_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.history_frame, text="📜 История")
@@ -933,6 +1043,11 @@ class IVRCallerApp:
         ttk.Button(
             btn_frame, text="📂 Выбрать TXT файл",
             command=self.load_phones_from_file, width=20
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Button(
+            btn_frame, text="📥 Скачать пример",
+            command=self.export_example_file, width=15
         ).pack(side=tk.LEFT, padx=(0, 10))
 
         ttk.Button(
@@ -1112,61 +1227,142 @@ class IVRCallerApp:
 
     def setup_history_tab(self):
         """Вкладка истории кампаний"""
-        # Заголовок
-        ttk.Label(
-            self.history_frame,
-            text="История запуска кампаний",
-            font=("Segoe UI", 12, "bold")
-        ).pack(pady=(10, 5))
+        # Создаем подвкладки для истории
+        self.history_notebook = ttk.Notebook(self.history_frame)
+        self.history_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Кнопка обновления
-        btn_frame = ttk.Frame(self.history_frame)
-        btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        # Подвкладка "В очереди"
+        self.queued_frame = ttk.Frame(self.history_notebook)
+        self.history_notebook.add(self.queued_frame, text="⏳ В очереди")
+        self.setup_queued_tab()
+
+        # Подвкладка "Завершенные"
+        self.completed_frame = ttk.Frame(self.history_notebook)
+        self.history_notebook.add(self.completed_frame, text="✅ Завершенные")
+        self.setup_completed_tab()
+
+    def setup_queued_tab(self):
+        """Подвкладка с кампаниями в очереди"""
+        # Поиск
+        search_frame = ttk.Frame(self.queued_frame)
+        search_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+
+        ttk.Label(search_frame, text="🔍 Поиск по номеру телефона:").pack(side=tk.LEFT, padx=(0, 10))
+        self.queued_search_var = tk.StringVar()
+        self.queued_search_var.trace("w", lambda *args: self.refresh_queued_history())
+        ttk.Entry(search_frame, textvariable=self.queued_search_var, width=20).pack(side=tk.LEFT, padx=(0, 10))
 
         ttk.Button(
-            btn_frame, text="🔄 Обновить",
-            command=self.refresh_history, width=12
+            search_frame, text="🔄 Обновить",
+            command=self.refresh_queued_history, width=12
         ).pack(side=tk.RIGHT)
 
-        # Таблица (Treeview)
-        tree_frame = ttk.Frame(self.history_frame)
+        # Таблица
+        tree_frame = ttk.Frame(self.queued_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
 
-        # Scrollbar
         scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Treeview
-        columns = ("status", "date", "type", "phones", "success", "fail")
-        self.history_tree = ttk.Treeview(
+        columns = ("scheduled_time", "type", "phones", "sender", "actions")
+        self.queued_tree = ttk.Treeview(
             tree_frame,
             columns=columns,
             show="headings",
             yscrollcommand=scrollbar.set,
-            height=15
+            height=12
         )
-        scrollbar.config(command=self.history_tree.yview)
+        scrollbar.config(command=self.queued_tree.yview)
 
-        # Заголовки колонок
-        self.history_tree.heading("status", text="Статус")
-        self.history_tree.heading("date", text="Дата и время")
-        self.history_tree.heading("type", text="Тип")
-        self.history_tree.heading("phones", text="Всего номеров")
-        self.history_tree.heading("success", text="Успешно")
-        self.history_tree.heading("fail", text="Ошибок")
+        self.queued_tree.heading("scheduled_time", text="📅 Запланировано")
+        self.queued_tree.heading("type", text="Тип")
+        self.queued_tree.heading("phones", text="Всего номеров")
+        self.queued_tree.heading("sender", text="Отправитель")
+        self.queued_tree.heading("actions", text="Действия")
 
-        # Ширина колонок
-        self.history_tree.column("status", width=100, anchor=tk.CENTER)
-        self.history_tree.column("date", width=180, anchor=tk.CENTER)
-        self.history_tree.column("type", width=200, anchor=tk.W)
-        self.history_tree.column("phones", width=120, anchor=tk.CENTER)
-        self.history_tree.column("success", width=100, anchor=tk.CENTER)
-        self.history_tree.column("fail", width=100, anchor=tk.CENTER)
+        self.queued_tree.column("scheduled_time", width=180, anchor=tk.CENTER)
+        self.queued_tree.column("type", width=200, anchor=tk.W)
+        self.queued_tree.column("phones", width=120, anchor=tk.CENTER)
+        self.queued_tree.column("sender", width=120, anchor=tk.CENTER)
+        self.queued_tree.column("actions", width=150, anchor=tk.CENTER)
 
-        self.history_tree.pack(fill=tk.BOTH, expand=True)
+        self.queued_tree.pack(fill=tk.BOTH, expand=True)
 
-        # Загружаем историю
-        self.refresh_history()
+        # Кнопки действий
+        btn_frame = ttk.Frame(self.queued_frame)
+        btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        ttk.Button(
+            btn_frame, text="📄 Экспорт запросов",
+            command=lambda: self.export_campaign_requests("queued")
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Button(
+            btn_frame, text="🗑️ Удалить из очереди",
+            command=self.delete_queued_campaign
+        ).pack(side=tk.LEFT)
+
+        self.refresh_queued_history()
+
+    def setup_completed_tab(self):
+        """Подвкладка с завершенными кампаниями"""
+        # Поиск
+        search_frame = ttk.Frame(self.completed_frame)
+        search_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+
+        ttk.Label(search_frame, text="🔍 Поиск по номеру телефона:").pack(side=tk.LEFT, padx=(0, 10))
+        self.completed_search_var = tk.StringVar()
+        self.completed_search_var.trace("w", lambda *args: self.refresh_completed_history())
+        ttk.Entry(search_frame, textvariable=self.completed_search_var, width=20).pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Button(
+            search_frame, text="🔄 Обновить",
+            command=self.refresh_completed_history, width=12
+        ).pack(side=tk.RIGHT)
+
+        # Таблица
+        tree_frame = ttk.Frame(self.completed_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        columns = ("status", "date", "type", "phones", "success", "fail")
+        self.completed_tree = ttk.Treeview(
+            tree_frame,
+            columns=columns,
+            show="headings",
+            yscrollcommand=scrollbar.set,
+            height=12
+        )
+        scrollbar.config(command=self.completed_tree.yview)
+
+        self.completed_tree.heading("status", text="Статус")
+        self.completed_tree.heading("date", text="Дата и время")
+        self.completed_tree.heading("type", text="Тип")
+        self.completed_tree.heading("phones", text="Всего номеров")
+        self.completed_tree.heading("success", text="Успешно")
+        self.completed_tree.heading("fail", text="Ошибок")
+
+        self.completed_tree.column("status", width=100, anchor=tk.CENTER)
+        self.completed_tree.column("date", width=180, anchor=tk.CENTER)
+        self.completed_tree.column("type", width=200, anchor=tk.W)
+        self.completed_tree.column("phones", width=120, anchor=tk.CENTER)
+        self.completed_tree.column("success", width=100, anchor=tk.CENTER)
+        self.completed_tree.column("fail", width=100, anchor=tk.CENTER)
+
+        self.completed_tree.pack(fill=tk.BOTH, expand=True)
+
+        # Кнопка экспорта
+        btn_frame = ttk.Frame(self.completed_frame)
+        btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        ttk.Button(
+            btn_frame, text="📄 Экспорт запросов",
+            command=lambda: self.export_campaign_requests("completed")
+        ).pack(side=tk.LEFT)
+
+        self.refresh_completed_history()
 
     def load_history(self):
         """Загрузка истории из файла"""
@@ -1190,91 +1386,223 @@ class IVRCallerApp:
 
     def add_campaign_to_history(self, campaign_data):
         """Добавление кампании в историю"""
+        import uuid
+        # Добавляем уникальный ID если его нет
+        if 'id' not in campaign_data:
+            campaign_data['id'] = str(uuid.uuid4())
+
         history = self.load_history()
         history.append(campaign_data)
         self.save_history(history)
-        self.refresh_history()
 
-    def refresh_history(self):
-        """Обновление отображения истории"""
+        # Обновляем обе вкладки
+        try:
+            self.refresh_queued_history()
+            self.refresh_completed_history()
+        except:
+            pass  # Если вкладки еще не созданы
+
+    def delete_queued_campaign(self):
+        """Удаление кампании из очереди"""
+        selection = self.queued_tree.selection()
+        if not selection:
+            messagebox.showwarning("Внимание", "Выберите кампанию для удаления")
+            return
+
+        if not messagebox.askyesno("Подтверждение", "Удалить выбранную кампанию из очереди?"):
+            return
+
+        # Получаем ID кампании из tags
+        item = selection[0]
+        campaign_id = self.queued_tree.item(item)['tags'][0]
+
+        # Загружаем историю и удаляем кампанию
+        history = self.load_history()
+        history = [c for c in history if c.get('id') != campaign_id]
+        self.save_history(history)
+
+        self.refresh_queued_history()
+        messagebox.showinfo("Успех", "Кампания удалена из очереди")
+
+    def export_campaign_requests(self, tab_type):
+        """Экспорт запросов кампании в txt файл"""
+        # Определяем какое дерево использовать
+        tree = self.queued_tree if tab_type == "queued" else self.completed_tree
+
+        selection = tree.selection()
+        if not selection:
+            messagebox.showwarning("Внимание", "Выберите кампанию для экспорта")
+            return
+
+        # Получаем ID кампании
+        item = selection[0]
+        campaign_id = tree.item(item)['tags'][0]
+
+        # Находим кампанию в истории
+        history = self.load_history()
+        campaign = None
+        for c in history:
+            if c.get('id') == campaign_id:
+                campaign = c
+                break
+
+        if not campaign:
+            messagebox.showerror("Ошибка", "Кампания не найдена")
+            return
+
+        # Формируем содержимое файла
+        from tkinter import filedialog
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            initialfile=f"campaign_export_{campaign.get('date', 'unknown').replace(':', '-')}.txt"
+        )
+
+        if not filename:
+            return
+
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write("=" * 80 + "\n")
+                f.write(f"ЭКСПОРТ КАМПАНИИ\n")
+                f.write("=" * 80 + "\n\n")
+                f.write(f"Тип: {campaign.get('alert_type', 'Не указан')}\n")
+                f.write(f"Дата создания: {campaign.get('date', 'Не указана')}\n")
+                f.write(f"Статус: {campaign.get('status', 'unknown')}\n")
+                f.write(f"Всего номеров: {campaign.get('total', 0)}\n")
+
+                if campaign.get('status') == 'completed':
+                    f.write(f"Успешно: {campaign.get('success', 0)}\n")
+                    f.write(f"Ошибок: {campaign.get('fail', 0)}\n")
+                elif campaign.get('status') == 'queued':
+                    f.write(f"Запланировано на: {campaign.get('scheduled_time', 'Не указано')}\n")
+
+                f.write(f"\nОтправитель: {campaign.get('sender_phone', 'Не указан')}\n")
+                f.write(f"Шаблон СМС: {campaign.get('sms_template', 'Не указан')}\n")
+
+                f.write("\n" + "=" * 80 + "\n")
+                f.write("ТЕКСТЫ СООБЩЕНИЙ\n")
+                f.write("=" * 80 + "\n\n")
+
+                voice_text = campaign.get('voice_text', '')
+                if voice_text:
+                    f.write(f"📞 Текст для озвучивания:\n{voice_text}\n\n")
+
+                sms_text = campaign.get('sms_text', '')
+                if sms_text:
+                    f.write(f"📱 Текст СМС:\n{sms_text}\n\n")
+
+                f.write("=" * 80 + "\n")
+                f.write("СПИСОК НОМЕРОВ И ЗАПРОСОВ\n")
+                f.write("=" * 80 + "\n\n")
+
+                phones_data = campaign.get('phones_data', [])
+                for i, phone_info in enumerate(phones_data, 1):
+                    f.write(f"{i}. Номер: {phone_info.get('number', 'Не указан')}\n")
+                    f.write(f"   Часовой пояс: UTC{phone_info.get('timezone', '+0')}\n")
+
+                    # Если есть информация о запросе
+                    request_info = phone_info.get('request_info', {})
+                    if request_info:
+                        f.write(f"   URL: {request_info.get('url', 'Не указан')}\n")
+                        f.write(f"   Параметры: {request_info.get('params', 'Не указаны')}\n")
+                        f.write(f"   Статус: {request_info.get('status', 'Не указан')}\n")
+
+                    f.write("\n")
+
+            messagebox.showinfo("Успех", f"Экспорт завершен!\n\nФайл сохранен:\n{filename}")
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Ошибка при экспорте:\n{e}")
+
+    def refresh_queued_history(self):
+        """Обновление отображения кампаний в очереди"""
         # Очищаем таблицу
-        for item in self.history_tree.get_children():
-            self.history_tree.delete(item)
+        for item in self.queued_tree.get_children():
+            self.queued_tree.delete(item)
 
         # Загружаем историю
         history = self.load_history()
 
-        # Сортируем по дате (новые сверху)
-        history.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        # Фильтруем только кампании в очереди
+        search_query = self.queued_search_var.get().strip()
+        queued_campaigns = []
+
+        for campaign in history:
+            if campaign.get('status') == 'queued':
+                # Поиск по номеру телефона
+                if search_query:
+                    phones = campaign.get('phones_data', [])
+                    found = any(search_query in phone.get('number', '') for phone in phones)
+                    if not found:
+                        continue
+                queued_campaigns.append(campaign)
+
+        # Сортируем по дате (ближайшие сверху)
+        queued_campaigns.sort(key=lambda x: x.get('scheduled_time', ''))
 
         # Заполняем таблицу
+        for campaign in queued_campaigns:
+            scheduled_time = campaign.get('scheduled_time', 'Не указано')
+            alert_type = campaign.get('alert_type', '')
+            total = campaign.get('total', 0)
+            sender = campaign.get('sender_phone', 'Не указан')
+
+            self.queued_tree.insert("", "end", values=(
+                scheduled_time,
+                alert_type,
+                total,
+                sender,
+                "📄 Экспорт"
+            ), tags=(campaign.get('id', ''),))
+
+    def refresh_completed_history(self):
+        """Обновление отображения завершенных кампаний"""
+        # Очищаем таблицу
+        for item in self.completed_tree.get_children():
+            self.completed_tree.delete(item)
+
+        # Загружаем историю
+        history = self.load_history()
+
+        # Фильтруем только завершенные кампании
+        search_query = self.completed_search_var.get().strip()
+        completed_campaigns = []
+
         for campaign in history:
-            status_icon = "✅ Запущено" if campaign.get('launched', False) else "❌ Не запущено"
+            if campaign.get('status') == 'completed':
+                # Поиск по номеру телефона
+                if search_query:
+                    phones = campaign.get('phones_data', [])
+                    found = any(search_query in phone.get('number', '') for phone in phones)
+                    if not found:
+                        continue
+                completed_campaigns.append(campaign)
+
+        # Сортируем по дате (новые сверху)
+        completed_campaigns.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+        # Заполняем таблицу
+        for campaign in completed_campaigns:
+            status_icon = "✅ Успешно" if campaign.get('success', 0) > 0 else "❌ Ошибка"
             date_str = campaign.get('date', '')
             alert_type = campaign.get('alert_type', '')
             total = campaign.get('total', 0)
             success = campaign.get('success', 0)
             fail = campaign.get('fail', 0)
 
-            self.history_tree.insert("", "end", values=(
+            self.completed_tree.insert("", "end", values=(
                 status_icon,
                 date_str,
                 alert_type,
                 total,
                 success,
                 fail
-            ))
+            ), tags=(campaign.get('id', ''),))
 
-    def setup_scenarios_tab(self):
-        ttk.Label(
-            self.scenarios_frame,
-            text="Нажмите на плитку для быстрой отправки",
-            font=("Segoe UI", 11)
-        ).pack(pady=(20, 10))
-
-        tiles_frame = ttk.Frame(self.scenarios_frame)
-        tiles_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-
-        row, col, max_cols = 0, 0, 2
-
-        for scenario_id, scenario in QUICK_SCENARIOS.items():
-            tile = self.create_tile(tiles_frame, scenario_id, scenario)
-            tile.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
-            col += 1
-            if col >= max_cols:
-                col = 0
-                row += 1
-
-        for i in range(max_cols):
-            tiles_frame.columnconfigure(i, weight=1)
-
-    def create_tile(self, parent, scenario_id, scenario):
-        emp_names = []
-        for emp_id in scenario["employee_ids"]:
-            if emp_id in self.employees:
-                emp_names.append(self.employees[emp_id]["name"].split()[0])
-
-        tile = tk.Frame(parent, bg=scenario["color"], cursor="hand2", relief=tk.RAISED, bd=2)
-        tile.configure(width=280, height=160)
-        tile.pack_propagate(False)
-
-        tk.Label(tile, text=scenario["name"], font=("Segoe UI", 14, "bold"), bg=scenario["color"], fg="white").pack(pady=(20, 5))
-        tk.Label(tile, text=scenario["description"], font=("Segoe UI", 10), bg=scenario["color"], fg="white").pack()
-
-        count_text = f"→ {len(emp_names)} чел." if emp_names else "→ 0 чел."
-        tk.Label(tile, text=count_text, font=("Segoe UI", 11, "bold"), bg=scenario["color"], fg="white").pack(pady=(10, 5))
-
-        preview = ", ".join(emp_names[:3]) + ("..." if len(emp_names) > 3 else "") if emp_names else "—"
-        tk.Label(tile, text=preview, font=("Segoe UI", 9), bg=scenario["color"], fg="white", wraplength=250).pack()
-
-        for widget in tile.winfo_children():
-            widget.bind("<Button-1>", lambda e, sid=scenario_id: self.run_scenario(sid))
-        tile.bind("<Button-1>", lambda e, sid=scenario_id: self.run_scenario(sid))
-
-        return tile
 
     def load_phones_from_file(self):
-        """Загрузка номеров из TXT файла"""
+        """Загрузка номеров из TXT файла (поддержка 2 колонок: номер + часовой пояс)"""
         from tkinter import filedialog
 
         filepath = filedialog.askopenfilename(
@@ -1293,29 +1621,47 @@ class IVRCallerApp:
             with open(filepath, 'r', encoding='cp1251') as f:
                 lines = f.readlines()
 
-        # Парсим номера
+        # Парсим номера (поддержка формата: номер или номер;часовой_пояс)
         new_phones = []
-        for line in lines:
-            phone = line.strip()
-            if not phone:
+        for line_num, line in enumerate(lines, 1):
+            line = line.strip()
+            if not line or line.startswith('#'):  # Пропускаем пустые строки и комментарии
                 continue
+
+            # Разделяем по табуляции или точке с запятой
+            parts = re.split(r'[\t;,]', line)
+
+            phone = parts[0].strip()
+            timezone = parts[1].strip() if len(parts) > 1 else "+0"
 
             # Нормализуем номер
             normalized = self._normalize_phone_simple(phone)
             if normalized:
-                new_phones.append(normalized)
+                # Проверяем что часовой пояс валидный
+                if not re.match(r'^[+-]?\d{1,2}$', timezone):
+                    timezone = "+0"
+
+                phone_data = {
+                    "number": normalized,
+                    "timezone": timezone
+                }
+                new_phones.append(phone_data)
 
         # Добавляем к списку (без дубликатов)
-        for phone in new_phones:
-            if phone not in self.file_phones:
-                self.file_phones.append(phone)
+        existing_numbers = [p.get('number') if isinstance(p, dict) else p for p in self.file_phones]
+        for phone_data in new_phones:
+            if phone_data['number'] not in existing_numbers:
+                self.file_phones.append(phone_data)
 
         self._update_phones_listbox()
 
         messagebox.showinfo(
             "Загружено",
             f"Добавлено номеров: {len(new_phones)}\n"
-            f"Всего в списке: {len(self.file_phones)}"
+            f"Всего в списке: {len(self.file_phones)}\n\n"
+            f"💡 Формат файла:\n"
+            f"номер;часовой_пояс\n"
+            f"Например: +79991234567;+3"
         )
 
     def _normalize_phone_simple(self, phone):
@@ -1342,8 +1688,12 @@ class IVRCallerApp:
     def _update_phones_listbox(self):
         """Обновление списка номеров в UI"""
         self.phones_listbox.delete(0, tk.END)
-        for i, phone in enumerate(self.file_phones, 1):
-            self.phones_listbox.insert(tk.END, f"{i}. {phone}")
+        for i, phone_info in enumerate(self.file_phones, 1):
+            if isinstance(phone_info, dict):
+                display = f"{i}. {phone_info['number']} (UTC{phone_info['timezone']})"
+            else:
+                display = f"{i}. {phone_info}"
+            self.phones_listbox.insert(tk.END, display)
 
         self.file_count_label.config(text=f"Загружено: {len(self.file_phones)} номеров")
 
@@ -1351,6 +1701,49 @@ class IVRCallerApp:
         """Очистка списка номеров"""
         self.file_phones = []
         self._update_phones_listbox()
+
+    def export_example_file(self):
+        """Экспорт примера файла с тестовыми данными"""
+        from tkinter import filedialog
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            initialfile="example_phones.txt"
+        )
+
+        if not filename:
+            return
+
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write("# Пример файла со списком номеров телефонов и часовыми поясами\n")
+                f.write("# Формат: номер_телефона;часовой_пояс_UTC\n")
+                f.write("# Часовой пояс указывается с + или - (например: +3, -5, +0)\n")
+                f.write("# Строки, начинающиеся с #, игнорируются\n")
+                f.write("#\n")
+                f.write("# Примеры:\n\n")
+                f.write("+79991234567;+3\n")
+                f.write("+79992345678;+5\n")
+                f.write("+79993456789;+0\n")
+                f.write("+79994567890;-2\n")
+                f.write("+79995678901;+7\n")
+                f.write("\n# Можно также использовать табуляцию или запятую как разделитель:\n")
+                f.write("# +79996789012\t+3\n")
+                f.write("# +79997890123,+5\n")
+                f.write("\n# Если часовой пояс не указан, используется UTC+0:\n")
+                f.write("# +79998901234\n")
+
+            messagebox.showinfo(
+                "Успех",
+                f"Пример файла создан!\n\n"
+                f"Файл сохранен:\n{filename}\n\n"
+                f"Откройте его в текстовом редакторе,\n"
+                f"замените тестовые данные на реальные\n"
+                f"и загрузите через кнопку '📂 Выбрать TXT файл'"
+            )
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Ошибка при создании файла:\n{e}")
 
     def refresh_employees(self):
         # Создаём окно с логом
@@ -1392,26 +1785,6 @@ class IVRCallerApp:
         self.employee_vars.clear()
         self.populate_employees_list()
 
-        for widget in self.scenarios_frame.winfo_children():
-            widget.destroy()
-        self.setup_scenarios_tab()
-
-    def run_scenario(self, scenario_id):
-        scenario = QUICK_SCENARIOS[scenario_id]
-
-        employees_to_call = []
-        for emp_id in scenario["employee_ids"]:
-            if emp_id in self.employees:
-                emp = self.employees[emp_id]
-                employees_to_call.append({"id": emp_id, "name": emp["name"], "phone": emp["phone"]})
-
-        if not employees_to_call:
-            messagebox.showwarning("Внимание", "Нет сотрудников для этого сценария!")
-            return
-
-        emp_list = "\n".join([f"  • {e['name']}" for e in employees_to_call])
-        if messagebox.askyesno("Подтверждение", f"Сценарий: {scenario['name']}\n\nБудут оповещены:\n{emp_list}\n\nОтправить?"):
-            self.send_alerts(employees_to_call, ALERT_TYPES[scenario["alert_type"]], scenario["name"])
 
     def send_constructor_alerts(self):
         # Проверка загруженных номеров
@@ -1428,35 +1801,107 @@ class IVRCallerApp:
             messagebox.showwarning("Внимание", "Заполните хотя бы одно текстовое поле!\n\n(Текст для озвучивания или текст для СМС)")
             return
 
+        # Валидация номера отправителя
+        sender_phone = self.sender_phone.get().strip()
+        if not sender_phone or len(sender_phone) != 11 or not sender_phone.startswith('7'):
+            messagebox.showwarning("Внимание", "Некорректный номер отправителя!\n\nДолжен быть 11 цифр, начинается с 7")
+            return
+
         alert_type = ALERT_TYPES[self.selected_alert_type.get()]
+
+        # Формируем phones_data с часовыми поясами
+        phones_data = []
+        for phone_info in self.file_phones:
+            if isinstance(phone_info, dict):
+                phones_data.append(phone_info)
+            else:
+                # Старый формат - только номер
+                phones_data.append({"number": phone_info, "timezone": "+0"})
 
         # Формируем список для отправки
         employees_to_call = []
-        for i, phone in enumerate(self.file_phones):
+        for i, phone_info in enumerate(phones_data):
+            phone = phone_info.get("number") if isinstance(phone_info, dict) else phone_info
             employees_to_call.append({
                 "id": f"file_{i}",
                 "name": f"Номер {phone}",
                 "phone": phone
             })
 
-        # Подготовка текста для подтверждения
-        confirm_text = f"Тип: {alert_type['name']}\n\n"
-        confirm_text += f"Количество номеров: {len(employees_to_call)}\n\n"
+        # Подготовка расширенных данных кампании
+        campaign_extra = {
+            "voice_text": voice_text,
+            "sms_text": sms_text,
+            "sender_phone": sender_phone,
+            "sms_template": self.sms_template.get().strip(),
+            "phones_data": phones_data
+        }
 
-        if voice_text:
-            confirm_text += f"📞 Текст для озвучивания:\n{voice_text[:100]}{'...' if len(voice_text) > 100 else ''}\n\n"
+        # Проверяем отложенную отправку
+        if self.delayed_send.get():
+            # Валидация даты и времени
+            send_date = self.send_date.get().strip()
+            send_time = self.send_time.get().strip()
 
-        if sms_text:
-            confirm_text += f"📱 Текст СМС:\n{sms_text[:100]}{'...' if len(sms_text) > 100 else ''}\n\n"
+            try:
+                scheduled_datetime = datetime.strptime(f"{send_date} {send_time}", "%Y-%m-%d %H:%M")
+                if scheduled_datetime <= datetime.now():
+                    messagebox.showwarning("Внимание", "Дата и время должны быть в будущем!")
+                    return
+            except ValueError:
+                messagebox.showwarning("Внимание", "Некорректный формат даты или времени!\n\nФормат: ГГГГ-ММ-ДД ЧЧ:ММ")
+                return
 
-        confirm_text += "Отправить оповещения?"
+            campaign_extra["scheduled_time"] = f"{send_date} {send_time}"
 
-        # Подтверждение
-        if messagebox.askyesno("Подтверждение", confirm_text):
-            self.send_alerts(employees_to_call, alert_type, "Конструктор")
+            # Сохраняем кампанию в очередь
+            confirm_text = f"Тип: {alert_type['name']}\n\n"
+            confirm_text += f"Количество номеров: {len(employees_to_call)}\n\n"
+            confirm_text += f"⏰ Запланировано на: {send_date} {send_time}\n\n"
 
-    def send_alerts(self, employees, alert_type, source):
+            if voice_text:
+                confirm_text += f"📞 Текст для озвучивания:\n{voice_text[:100]}{'...' if len(voice_text) > 100 else ''}\n\n"
+
+            if sms_text:
+                confirm_text += f"📱 Текст СМС:\n{sms_text[:100]}{'...' if len(sms_text) > 100 else ''}\n\n"
+
+            confirm_text += "Добавить в очередь?"
+
+            if messagebox.askyesno("Подтверждение", confirm_text):
+                import uuid
+                # Создаем кампанию в очереди
+                campaign_data = {
+                    "id": str(uuid.uuid4()),
+                    "timestamp": datetime.now().isoformat(),
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "alert_type": alert_type["name"],
+                    "source": "Конструктор",
+                    "total": len(employees_to_call),
+                    "status": "queued",
+                    **campaign_extra
+                }
+                self.add_campaign_to_history(campaign_data)
+                messagebox.showinfo("Успех", f"Кампания добавлена в очередь!\n\nЗапуск: {send_date} {send_time}")
+        else:
+            # Немедленная отправка
+            confirm_text = f"Тип: {alert_type['name']}\n\n"
+            confirm_text += f"Количество номеров: {len(employees_to_call)}\n\n"
+
+            if voice_text:
+                confirm_text += f"📞 Текст для озвучивания:\n{voice_text[:100]}{'...' if len(voice_text) > 100 else ''}\n\n"
+
+            if sms_text:
+                confirm_text += f"📱 Текст СМС:\n{sms_text[:100]}{'...' if len(sms_text) > 100 else ''}\n\n"
+
+            confirm_text += "Отправить оповещения?"
+
+            # Подтверждение
+            if messagebox.askyesno("Подтверждение", confirm_text):
+                self.send_alerts(employees_to_call, alert_type, "Конструктор", campaign_extra)
+
+    def send_alerts(self, employees, alert_type, source, campaign_extra=None):
         success, fail = 0, 0
+        requests_log = []
 
         progress = tk.Toplevel(self.root)
         progress.title("Отправка...")
@@ -1475,7 +1920,39 @@ class IVRCallerApp:
             bar["value"] = i + 1
             progress.update()
 
-            if self.send_single_request(emp["phone"], alert_type["service"], alert_type["monitor_bank_id"]):
+            # Получаем данные для запроса
+            phone_info = campaign_extra.get('phones_data', [])[i] if campaign_extra else {}
+            timezone = phone_info.get('timezone', '+0') if isinstance(phone_info, dict) else '+0'
+            voice_text = campaign_extra.get('voice_text', '') if campaign_extra else ''
+            sender_phone = campaign_extra.get('sender_phone', '') if campaign_extra else ''
+
+            # Получаем ключ типа оповещения из ALERT_TYPES
+            alert_type_key = None
+            for key, alert in ALERT_TYPES.items():
+                if alert['name'] == alert_type['name']:
+                    alert_type_key = key
+                    break
+
+            request_result = self.send_single_request(
+                phone=emp["phone"],
+                timezone=timezone,
+                voice_text=voice_text,
+                sender_phone=sender_phone,
+                alert_type_key=alert_type_key or 'call'
+            )
+
+            # Логируем информацию о запросе
+            request_info = {
+                "url": self.config.api_url,
+                "params": f"ANI={emp['phone']}, TZ_DBID={timezone}, SERVICE=IVR_Quality_Control",
+                "status": "success" if request_result else "failed"
+            }
+
+            # Обновляем phone_data с информацией о запросе
+            if campaign_extra and 'phones_data' in campaign_extra and i < len(campaign_extra['phones_data']):
+                campaign_extra['phones_data'][i]['request_info'] = request_info
+
+            if request_result:
                 success += 1
                 self._log_action("SUCCESS", f"{source} | {emp['name']} | {emp['phone']} | CONNID: {self.current_connid - 1}")
             else:
@@ -1494,8 +1971,14 @@ class IVRCallerApp:
             "total": len(employees),
             "success": success,
             "fail": fail,
+            "status": "completed",
             "launched": True
         }
+
+        # Добавляем расширенные данные если есть
+        if campaign_extra:
+            campaign_data.update(campaign_extra)
+
         self.add_campaign_to_history(campaign_data)
 
         if fail == 0:
@@ -1503,24 +1986,54 @@ class IVRCallerApp:
         else:
             messagebox.showwarning("Внимание", f"Успешно: {success}\nОшибок: {fail}")
 
-    def send_single_request(self, phone, service, monitor_bank_id):
+    def send_single_request(self, phone, timezone, voice_text, sender_phone, alert_type_key):
+        """
+        Отправка запроса на API для типа "Позвонить"
+
+        Args:
+            phone: Номер телефона (ANI)
+            timezone: Часовой пояс (TZ_DBID) из файла, например "+3"
+            voice_text: Текст для озвучивания
+            sender_phone: Номер отправителя (CPD)
+            alert_type_key: Тип оповещения ("call", "call_sms", "sms")
+        """
         try:
+            import uuid as uuid_module
+
+            # Генерируем уникальный CONNID
+            connid = str(uuid_module.uuid4()).upper()
+
+            # Конвертируем часовой пояс в формат TZ_DBID
+            # Например: "+3" -> "3", "-5" -> "-5", "+0" -> "0"
+            tz_dbid = timezone.replace('+', '') if timezone else "0"
+
+            # Формируем ADD_PROP в зависимости от типа
+            add_prop = {}
+
+            if alert_type_key == "call":
+                # Только звонок
+                add_prop = {
+                    "text_voice": voice_text,
+                    "CPD": sender_phone
+                }
+
+            # Формируем данные запроса
             data = {
                 "ANI": phone,
-                "CONNID": f"{self.current_connid}7",
-                "TZ_DBID": "1",
-                "SERVICE": service,
+                "CONNID": connid,
+                "TZ_DBID": tz_dbid,
+                "CUSTID": "499287966839",  # Как в примере
+                "SERVICE": "IVR_Quality_Control",
                 "DELAY": "1",
-                "ADD_PROP": json.dumps({"MONITOR_BANK_ID": monitor_bank_id}),
-                "CUSTID": "1000"
+                "ADD_PROP": json.dumps(add_prop, ensure_ascii=False)
             }
 
-            json_data = json.dumps(data).encode("utf-8")
+            json_data = json.dumps(data, ensure_ascii=False).encode("utf-8")
 
             request = urllib.request.Request(
                 self.config.api_url,
                 data=json_data,
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json; charset=utf-8"},
                 method="POST"
             )
 
@@ -1546,8 +2059,19 @@ class IVRCallerApp:
 
 
 def main():
+    # Показываем окно авторизации
+    login_root = tk.Tk()
+    login_window = LoginWindow(login_root)
+    login_root.mainloop()
+
+    # Проверяем результат авторизации
+    if not login_window.authenticated:
+        print("Авторизация отменена")
+        return
+
+    # Запускаем основное приложение
     root = tk.Tk()
-    app = IVRCallerApp(root)
+    app = IVRCallerApp(root, username=login_window.username)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
 
