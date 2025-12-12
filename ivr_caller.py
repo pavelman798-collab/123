@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-IVR Caller v4 — приложение для оповещения по IVR
+Outbound Manager — приложение для управления исходящими звонками и SMS
 С загрузкой сотрудников из PostgreSQL или PHP-страницы
 """
 
@@ -58,39 +58,6 @@ ALERT_TYPES = {
 
 
 # ============== БЫСТРЫЕ СЦЕНАРИИ ==============
-QUICK_SCENARIOS = {
-    "critical_sboy": {
-        "name": "🔴 Критичный сбой",
-        "description": "Руководство + IT",
-        "color": "#e74c3c",
-        "alert_type": "sboy",
-        "employee_ids": [531, 533, 534]  # ID из БД/PHP
-    },
-    "daily_metrics": {
-        "name": "📊 Ежедневные метрики",
-        "description": "Аналитики",
-        "color": "#3498db",
-        "alert_type": "metrika",
-        "employee_ids": [535, 536]
-    },
-    "tech_maintenance": {
-        "name": "🔧 Плановые работы",
-        "description": "IT-отдел полностью",
-        "color": "#f39c12",
-        "alert_type": "tech_work",
-        "employee_ids": [531, 533, 537, 538]
-    },
-    "security_alert": {
-        "name": "🔒 Инцидент ИБ",
-        "description": "Безопасность + Рук-во",
-        "color": "#9b59b6",
-        "alert_type": "security",
-        "employee_ids": [539, 540, 531]
-    },
-}
-# =============================================
-
-
 # ============== ТЕСТОВЫЕ ДАННЫЕ ==============
 FALLBACK_EMPLOYEES = {
     531: {"name": "Горбачев Иван Геннадиевич", "phone": "+79991111111"},
@@ -132,7 +99,7 @@ class Config:
             'employees_url': '/admin/people.php',
             'username': 'admin', 'password': 'password'
         }
-        self.config['api'] = {'url': 'https://your-api/call'}
+        self.config['api'] = {'url': 'http://172.16.152.67:80/fm2/UDB/IVR_ADD_CALL_EXP'}
         self.config['settings'] = {
             'data_source': 'auto', 'db_timeout': '10',
             'api_timeout': '30', 'php_timeout': '30', 'verify_ssl': 'false'
@@ -755,7 +722,7 @@ class LoginWindow:
 
     def __init__(self, root):
         self.root = root
-        self.root.title("🔐 Авторизация - IVR Caller")
+        self.root.title("🔐 Авторизация - Outbound Manager")
         self.root.geometry("400x300")
         self.root.resizable(False, False)
 
@@ -787,7 +754,7 @@ class LoginWindow:
 
         ttk.Label(
             title_frame,
-            text="IVR Caller v4",
+            text="Outbound Manager v5",
             font=("Segoe UI", 10),
             foreground="gray"
         ).pack(pady=(5, 0))
@@ -888,7 +855,7 @@ class IVRCallerApp:
 
     def __init__(self, root, username=None):
         self.root = root
-        self.root.title("📞 IVR Оповещения v4")
+        self.root.title("📞 Outbound Manager")
         self.root.geometry("750x650")
         self.root.resizable(True, True)
         self.root.minsize(650, 550)
@@ -969,10 +936,6 @@ class IVRCallerApp:
         self.constructor_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.constructor_frame, text="📝 Конструктор")
         self.setup_constructor_tab()
-
-        self.scenarios_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.scenarios_frame, text="⚡ Быстрые сценарии")
-        self.setup_scenarios_tab()
 
         self.history_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.history_frame, text="📜 История")
@@ -1637,53 +1600,6 @@ class IVRCallerApp:
                 fail
             ), tags=(campaign.get('id', ''),))
 
-    def setup_scenarios_tab(self):
-        ttk.Label(
-            self.scenarios_frame,
-            text="Нажмите на плитку для быстрой отправки",
-            font=("Segoe UI", 11)
-        ).pack(pady=(20, 10))
-
-        tiles_frame = ttk.Frame(self.scenarios_frame)
-        tiles_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-
-        row, col, max_cols = 0, 0, 2
-
-        for scenario_id, scenario in QUICK_SCENARIOS.items():
-            tile = self.create_tile(tiles_frame, scenario_id, scenario)
-            tile.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
-            col += 1
-            if col >= max_cols:
-                col = 0
-                row += 1
-
-        for i in range(max_cols):
-            tiles_frame.columnconfigure(i, weight=1)
-
-    def create_tile(self, parent, scenario_id, scenario):
-        emp_names = []
-        for emp_id in scenario["employee_ids"]:
-            if emp_id in self.employees:
-                emp_names.append(self.employees[emp_id]["name"].split()[0])
-
-        tile = tk.Frame(parent, bg=scenario["color"], cursor="hand2", relief=tk.RAISED, bd=2)
-        tile.configure(width=280, height=160)
-        tile.pack_propagate(False)
-
-        tk.Label(tile, text=scenario["name"], font=("Segoe UI", 14, "bold"), bg=scenario["color"], fg="white").pack(pady=(20, 5))
-        tk.Label(tile, text=scenario["description"], font=("Segoe UI", 10), bg=scenario["color"], fg="white").pack()
-
-        count_text = f"→ {len(emp_names)} чел." if emp_names else "→ 0 чел."
-        tk.Label(tile, text=count_text, font=("Segoe UI", 11, "bold"), bg=scenario["color"], fg="white").pack(pady=(10, 5))
-
-        preview = ", ".join(emp_names[:3]) + ("..." if len(emp_names) > 3 else "") if emp_names else "—"
-        tk.Label(tile, text=preview, font=("Segoe UI", 9), bg=scenario["color"], fg="white", wraplength=250).pack()
-
-        for widget in tile.winfo_children():
-            widget.bind("<Button-1>", lambda e, sid=scenario_id: self.run_scenario(sid))
-        tile.bind("<Button-1>", lambda e, sid=scenario_id: self.run_scenario(sid))
-
-        return tile
 
     def load_phones_from_file(self):
         """Загрузка номеров из TXT файла (поддержка 2 колонок: номер + часовой пояс)"""
@@ -1869,26 +1785,6 @@ class IVRCallerApp:
         self.employee_vars.clear()
         self.populate_employees_list()
 
-        for widget in self.scenarios_frame.winfo_children():
-            widget.destroy()
-        self.setup_scenarios_tab()
-
-    def run_scenario(self, scenario_id):
-        scenario = QUICK_SCENARIOS[scenario_id]
-
-        employees_to_call = []
-        for emp_id in scenario["employee_ids"]:
-            if emp_id in self.employees:
-                emp = self.employees[emp_id]
-                employees_to_call.append({"id": emp_id, "name": emp["name"], "phone": emp["phone"]})
-
-        if not employees_to_call:
-            messagebox.showwarning("Внимание", "Нет сотрудников для этого сценария!")
-            return
-
-        emp_list = "\n".join([f"  • {e['name']}" for e in employees_to_call])
-        if messagebox.askyesno("Подтверждение", f"Сценарий: {scenario['name']}\n\nБудут оповещены:\n{emp_list}\n\nОтправить?"):
-            self.send_alerts(employees_to_call, ALERT_TYPES[scenario["alert_type"]], scenario["name"])
 
     def send_constructor_alerts(self):
         # Проверка загруженных номеров
@@ -2024,13 +1920,31 @@ class IVRCallerApp:
             bar["value"] = i + 1
             progress.update()
 
-            request_result = self.send_single_request(emp["phone"], alert_type["service"], alert_type["monitor_bank_id"])
+            # Получаем данные для запроса
+            phone_info = campaign_extra.get('phones_data', [])[i] if campaign_extra else {}
+            timezone = phone_info.get('timezone', '+0') if isinstance(phone_info, dict) else '+0'
+            voice_text = campaign_extra.get('voice_text', '') if campaign_extra else ''
+            sender_phone = campaign_extra.get('sender_phone', '') if campaign_extra else ''
+
+            # Получаем ключ типа оповещения из ALERT_TYPES
+            alert_type_key = None
+            for key, alert in ALERT_TYPES.items():
+                if alert['name'] == alert_type['name']:
+                    alert_type_key = key
+                    break
+
+            request_result = self.send_single_request(
+                phone=emp["phone"],
+                timezone=timezone,
+                voice_text=voice_text,
+                sender_phone=sender_phone,
+                alert_type_key=alert_type_key or 'call'
+            )
 
             # Логируем информацию о запросе
-            phone_data = campaign_extra.get('phones_data', [])[i] if campaign_extra else {}
             request_info = {
-                "url": f"{self.config.get('web_url', '')}/path/to/api",
-                "params": f"ANI={emp['phone']}, SERVICE={alert_type['service']}, MONITOR_BANK_ID={alert_type['monitor_bank_id']}",
+                "url": self.config.api_url,
+                "params": f"ANI={emp['phone']}, TZ_DBID={timezone}, SERVICE=IVR_Quality_Control",
                 "status": "success" if request_result else "failed"
             }
 
@@ -2072,24 +1986,54 @@ class IVRCallerApp:
         else:
             messagebox.showwarning("Внимание", f"Успешно: {success}\nОшибок: {fail}")
 
-    def send_single_request(self, phone, service, monitor_bank_id):
+    def send_single_request(self, phone, timezone, voice_text, sender_phone, alert_type_key):
+        """
+        Отправка запроса на API для типа "Позвонить"
+
+        Args:
+            phone: Номер телефона (ANI)
+            timezone: Часовой пояс (TZ_DBID) из файла, например "+3"
+            voice_text: Текст для озвучивания
+            sender_phone: Номер отправителя (CPD)
+            alert_type_key: Тип оповещения ("call", "call_sms", "sms")
+        """
         try:
+            import uuid as uuid_module
+
+            # Генерируем уникальный CONNID
+            connid = str(uuid_module.uuid4()).upper()
+
+            # Конвертируем часовой пояс в формат TZ_DBID
+            # Например: "+3" -> "3", "-5" -> "-5", "+0" -> "0"
+            tz_dbid = timezone.replace('+', '') if timezone else "0"
+
+            # Формируем ADD_PROP в зависимости от типа
+            add_prop = {}
+
+            if alert_type_key == "call":
+                # Только звонок
+                add_prop = {
+                    "text_voice": voice_text,
+                    "CPD": sender_phone
+                }
+
+            # Формируем данные запроса
             data = {
                 "ANI": phone,
-                "CONNID": f"{self.current_connid}7",
-                "TZ_DBID": "1",
-                "SERVICE": service,
+                "CONNID": connid,
+                "TZ_DBID": tz_dbid,
+                "CUSTID": "499287966839",  # Как в примере
+                "SERVICE": "IVR_Quality_Control",
                 "DELAY": "1",
-                "ADD_PROP": json.dumps({"MONITOR_BANK_ID": monitor_bank_id}),
-                "CUSTID": "1000"
+                "ADD_PROP": json.dumps(add_prop, ensure_ascii=False)
             }
 
-            json_data = json.dumps(data).encode("utf-8")
+            json_data = json.dumps(data, ensure_ascii=False).encode("utf-8")
 
             request = urllib.request.Request(
                 self.config.api_url,
                 data=json_data,
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json; charset=utf-8"},
                 method="POST"
             )
 
