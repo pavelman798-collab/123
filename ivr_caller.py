@@ -1086,14 +1086,14 @@ class IVRCallerApp:
         params_frame = ttk.LabelFrame(frame_inner, text="Шаг 4: Параметры кампании", padding="10")
         params_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        # Номер отправителя
+        # Номер отправителя (обязательное поле)
         sender_frame = ttk.Frame(params_frame)
         sender_frame.pack(fill=tk.X, pady=(0, 10))
 
         ttk.Label(
             sender_frame,
-            text="Телефонный номер отправителя:",
-            font=("Segoe UI", 10)
+            text="Номер с которого совершать вызов: *",
+            font=("Segoe UI", 10, "bold")
         ).pack(side=tk.LEFT, padx=(0, 10))
 
         self.sender_phone = tk.StringVar()
@@ -1113,18 +1113,20 @@ class IVRCallerApp:
             foreground="gray"
         ).pack(anchor=tk.W, pady=(0, 10))
 
-        # Номер шаблона СМС
+        # Номер шаблона СМС (условно обязательное поле)
         template_frame = ttk.Frame(params_frame)
         template_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(
+        self.template_label = ttk.Label(
             template_frame,
             text="Номер шаблона СМС:",
             font=("Segoe UI", 10)
-        ).pack(side=tk.LEFT, padx=(0, 10))
+        )
+        self.template_label.pack(side=tk.LEFT, padx=(0, 10))
 
         self.sms_template = tk.StringVar()
-        ttk.Entry(template_frame, textvariable=self.sms_template, width=20, font=("Consolas", 10)).pack(side=tk.LEFT)
+        self.sms_template_entry = ttk.Entry(template_frame, textvariable=self.sms_template, width=20, font=("Consolas", 10))
+        self.sms_template_entry.pack(side=tk.LEFT)
 
         # Отложенная отправка
         delayed_frame = ttk.Frame(params_frame)
@@ -1181,14 +1183,25 @@ class IVRCallerApp:
             # Позвонить - только поле озвучивания
             self.voice_text.config(state='normal', bg='white')
             self.sms_text.config(state='disabled', bg='#f0f0f0')
+            # Номер шаблона СМС не требуется
+            self.sms_template_entry.config(state='disabled')
+            self.template_label.config(text="Номер шаблона СМС:")
+
         elif alert_type == "sms":
             # Отправить СМС - только поле СМС
             self.voice_text.config(state='disabled', bg='#f0f0f0')
             self.sms_text.config(state='normal', bg='white')
+            # Номер шаблона СМС обязателен
+            self.sms_template_entry.config(state='normal')
+            self.template_label.config(text="Номер шаблона СМС: *", font=("Segoe UI", 10, "bold"))
+
         elif alert_type == "call_sms":
             # Позвонить и отправить СМС - оба поля
             self.voice_text.config(state='normal', bg='white')
             self.sms_text.config(state='normal', bg='white')
+            # Номер шаблона СМС обязателен
+            self.sms_template_entry.config(state='normal')
+            self.template_label.config(text="Номер шаблона СМС: *", font=("Segoe UI", 10, "bold"))
 
     def validate_sender_phone(self, *args):
         """Валидация номера отправителя"""
@@ -1499,15 +1512,25 @@ class IVRCallerApp:
 
                 phones_data = campaign.get('phones_data', [])
                 for i, phone_info in enumerate(phones_data, 1):
-                    f.write(f"{i}. Номер: {phone_info.get('number', 'Не указан')}\n")
-                    f.write(f"   Часовой пояс: UTC{phone_info.get('timezone', '+0')}\n")
+                    f.write(f"\n{'-' * 80}\n")
+                    f.write(f"ЗАПРОС #{i}\n")
+                    f.write(f"{'-' * 80}\n\n")
 
-                    # Если есть информация о запросе
+                    f.write(f"Номер: {phone_info.get('number', 'Не указан')}\n")
+                    f.write(f"Часовой пояс: UTC{phone_info.get('timezone', '+0')}\n\n")
+
+                    # Выводим полный JSON запроса
                     request_info = phone_info.get('request_info', {})
                     if request_info:
-                        f.write(f"   URL: {request_info.get('url', 'Не указан')}\n")
-                        f.write(f"   Параметры: {request_info.get('params', 'Не указаны')}\n")
-                        f.write(f"   Статус: {request_info.get('status', 'Не указан')}\n")
+                        f.write(f"URL: {request_info.get('url', 'Не указан')}\n")
+                        f.write(f"Статус: {request_info.get('status', 'Не указан')}\n\n")
+
+                        # Полный JSON запроса в читаемом формате
+                        request_json = request_info.get('request_json', {})
+                        if request_json:
+                            f.write("JSON ЗАПРОСА:\n")
+                            f.write(json.dumps(request_json, ensure_ascii=False, indent=4))
+                            f.write("\n")
 
                     f.write("\n")
 
@@ -1801,13 +1824,21 @@ class IVRCallerApp:
             messagebox.showwarning("Внимание", "Заполните хотя бы одно текстовое поле!\n\n(Текст для озвучивания или текст для СМС)")
             return
 
-        # Валидация номера отправителя
+        # Валидация номера отправителя (обязательное поле)
         sender_phone = self.sender_phone.get().strip()
         if not sender_phone or len(sender_phone) != 11 or not sender_phone.startswith('7'):
-            messagebox.showwarning("Внимание", "Некорректный номер отправителя!\n\nДолжен быть 11 цифр, начинается с 7")
+            messagebox.showwarning("Внимание", "Заполните обязательное поле!\n\n'Номер с которого совершать вызов'\nДолжен быть 11 цифр, начинается с 7")
             return
 
-        alert_type = ALERT_TYPES[self.selected_alert_type.get()]
+        alert_type_key = self.selected_alert_type.get()
+        alert_type = ALERT_TYPES[alert_type_key]
+
+        # Валидация номера шаблона СМС для типов "sms" и "call_sms"
+        sms_template = self.sms_template.get().strip()
+        if alert_type_key in ["sms", "call_sms"]:
+            if not sms_template:
+                messagebox.showwarning("Внимание", "Заполните обязательное поле!\n\n'Номер шаблона СМС' обязателен для этого типа оповещения")
+                return
 
         # Формируем phones_data с часовыми поясами
         phones_data = []
@@ -1924,7 +1955,9 @@ class IVRCallerApp:
             phone_info = campaign_extra.get('phones_data', [])[i] if campaign_extra else {}
             timezone = phone_info.get('timezone', '+0') if isinstance(phone_info, dict) else '+0'
             voice_text = campaign_extra.get('voice_text', '') if campaign_extra else ''
+            sms_text = campaign_extra.get('sms_text', '') if campaign_extra else ''
             sender_phone = campaign_extra.get('sender_phone', '') if campaign_extra else ''
+            sms_template = campaign_extra.get('sms_template', '') if campaign_extra else ''
 
             # Получаем ключ типа оповещения из ALERT_TYPES
             alert_type_key = None
@@ -1933,19 +1966,21 @@ class IVRCallerApp:
                     alert_type_key = key
                     break
 
-            request_result = self.send_single_request(
+            request_result, request_data = self.send_single_request(
                 phone=emp["phone"],
                 timezone=timezone,
                 voice_text=voice_text,
+                sms_text=sms_text,
                 sender_phone=sender_phone,
+                sms_template=sms_template,
                 alert_type_key=alert_type_key or 'call'
             )
 
-            # Логируем информацию о запросе
+            # Логируем информацию о запросе с полным JSON
             request_info = {
                 "url": self.config.api_url,
-                "params": f"ANI={emp['phone']}, TZ_DBID={timezone}, SERVICE=IVR_Quality_Control",
-                "status": "success" if request_result else "failed"
+                "status": "success" if request_result else "failed",
+                "request_json": request_data  # Полный JSON запроса
             }
 
             # Обновляем phone_data с информацией о запросе
@@ -1986,16 +2021,21 @@ class IVRCallerApp:
         else:
             messagebox.showwarning("Внимание", f"Успешно: {success}\nОшибок: {fail}")
 
-    def send_single_request(self, phone, timezone, voice_text, sender_phone, alert_type_key):
+    def send_single_request(self, phone, timezone, voice_text, sms_text, sender_phone, sms_template, alert_type_key):
         """
-        Отправка запроса на API для типа "Позвонить"
+        Отправка запроса на API
 
         Args:
             phone: Номер телефона (ANI)
             timezone: Часовой пояс (TZ_DBID) из файла, например "+3"
             voice_text: Текст для озвучивания
-            sender_phone: Номер отправителя (CPD)
+            sms_text: Текст СМС
+            sender_phone: Номер отправителя (CPN)
+            sms_template: Номер шаблона СМС
             alert_type_key: Тип оповещения ("call", "call_sms", "sms")
+
+        Returns:
+            tuple: (success: bool, request_data: dict) - результат и данные запроса
         """
         try:
             import uuid as uuid_module
@@ -2009,21 +2049,33 @@ class IVRCallerApp:
 
             # Формируем ADD_PROP в зависимости от типа
             add_prop = {}
+            service = "MONITOR_BANK"  # По умолчанию
 
             if alert_type_key == "call":
                 # Только звонок
                 add_prop = {
                     "text_voice": voice_text,
-                    "CPD": sender_phone
+                    "CPN": sender_phone
                 }
+                service = "MONITOR_BANK"
+
+            elif alert_type_key == "call_sms":
+                # Звонок + СМС
+                add_prop = {
+                    "text_voice": voice_text,
+                    "CPN": sender_phone,
+                    "sms_text": sms_text,
+                    "template": sms_template
+                }
+                service = "IVR_Quality_Control"
 
             # Формируем данные запроса
             data = {
                 "ANI": phone,
                 "CONNID": connid,
                 "TZ_DBID": tz_dbid,
-                "CUSTID": "499287966839",  # Как в примере
-                "SERVICE": "IVR_Quality_Control",
+                "CUSTID": "499287966839",
+                "SERVICE": service,
                 "DELAY": "1",
                 "ADD_PROP": json.dumps(add_prop, ensure_ascii=False)
             }
@@ -2047,11 +2099,12 @@ class IVRCallerApp:
 
             self.current_connid += 1
             self._save_connid()
-            return True
+            return (True, data)
 
         except Exception as e:
             print(f"Ошибка: {phone} - {e}")
-            return False
+            # Возвращаем данные запроса даже при ошибке
+            return (False, data if 'data' in locals() else {})
 
     def on_closing(self):
         self.data_loader.disconnect()
