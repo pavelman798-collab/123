@@ -181,6 +181,20 @@ class Config:
     def verify_ssl(self):
         return self.config.getboolean('settings', 'verify_ssl', fallback=False)
 
+    def get(self, key, default=''):
+        """Получить значение из секции auth"""
+        if not self.config.has_section('auth'):
+            return default
+        return self.config.get('auth', key, fallback=default)
+
+    def set(self, key, value):
+        """Установить значение в секцию auth"""
+        if not self.config.has_section('auth'):
+            self.config.add_section('auth')
+        self.config.set('auth', key, value)
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            self.config.write(f)
+
 
 class DatabaseManager:
     """Работа с PostgreSQL"""
