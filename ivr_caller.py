@@ -2027,7 +2027,7 @@ class IVRCallerApp:
                 # Только звонок
                 add_prop = {
                     "text_voice": voice_text,
-                    "CPD": sender_phone
+                    "CPN": sender_phone
                 }
 
             # Формируем данные запроса
@@ -2036,7 +2036,7 @@ class IVRCallerApp:
                 "CONNID": connid,
                 "TZ_DBID": tz_dbid,
                 "CUSTID": "499287966839",  # Как в примере
-                "SERVICE": "IVR_Quality_Control",
+                "SERVICE": "MONITOR_BANK",
                 "DELAY": "1",
                 "ADD_PROP": json.dumps(add_prop, ensure_ascii=False)
             }
