@@ -843,8 +843,34 @@ class IVRCallerApp:
         # Инициализация списка номеров
         self.file_phones = []
 
+        # Создаем Canvas с прокруткой для длинного содержимого
+        canvas = tk.Canvas(self.constructor_frame, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.constructor_frame, orient="vertical", command=canvas.yview)
+
+        # Внутренний фрейм для содержимого
+        frame_inner = ttk.Frame(canvas)
+
+        # Конфигурация прокрутки
+        frame_inner.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=frame_inner, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Размещение элементов
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Прокрутка колесиком мыши
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
         # Тип оповещения
-        alert_frame = ttk.LabelFrame(self.constructor_frame, text="Шаг 1: Тип оповещения", padding="10")
+        alert_frame = ttk.LabelFrame(frame_inner, text="Шаг 1: Тип оповещения", padding="10")
         alert_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
 
         col_idx = 0
@@ -859,7 +885,7 @@ class IVRCallerApp:
         self.selected_alert_type.trace("w", self.toggle_text_fields)
 
         # Текстовые поля
-        text_frame = ttk.LabelFrame(self.constructor_frame, text="Шаг 2: Содержимое сообщений", padding="10")
+        text_frame = ttk.LabelFrame(frame_inner, text="Шаг 2: Содержимое сообщений", padding="10")
         text_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # Поле для озвучивания
@@ -897,7 +923,7 @@ class IVRCallerApp:
         self.sms_text.pack(fill=tk.X)
 
         # Загрузка номеров из файла
-        file_load_frame = ttk.LabelFrame(self.constructor_frame, text="Шаг 3: Загрузка номеров телефонов", padding="10")
+        file_load_frame = ttk.LabelFrame(frame_inner, text="Шаг 3: Загрузка номеров телефонов", padding="10")
         file_load_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # Кнопки загрузки
@@ -942,7 +968,7 @@ class IVRCallerApp:
         ).pack(anchor=tk.W, pady=(5, 0))
 
         # Шаг 4: Параметры кампании
-        params_frame = ttk.LabelFrame(self.constructor_frame, text="Шаг 4: Параметры кампании", padding="10")
+        params_frame = ttk.LabelFrame(frame_inner, text="Шаг 4: Параметры кампании", padding="10")
         params_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # Номер отправителя
@@ -1021,7 +1047,7 @@ class IVRCallerApp:
         ).pack(anchor=tk.W, pady=(5, 0))
 
         # Нижняя панель - кнопка отправки
-        bottom_frame = ttk.Frame(self.constructor_frame)
+        bottom_frame = ttk.Frame(frame_inner)
         bottom_frame.pack(fill=tk.X, padx=10, pady=10)
 
         ttk.Button(
