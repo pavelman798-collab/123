@@ -1086,14 +1086,14 @@ class IVRCallerApp:
         params_frame = ttk.LabelFrame(frame_inner, text="Шаг 4: Параметры кампании", padding="10")
         params_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        # Номер отправителя
+        # Номер отправителя (обязательное поле)
         sender_frame = ttk.Frame(params_frame)
         sender_frame.pack(fill=tk.X, pady=(0, 10))
 
         ttk.Label(
             sender_frame,
-            text="Телефонный номер отправителя:",
-            font=("Segoe UI", 10)
+            text="Номер с которого совершать вызов: *",
+            font=("Segoe UI", 10, "bold")
         ).pack(side=tk.LEFT, padx=(0, 10))
 
         self.sender_phone = tk.StringVar()
@@ -1113,18 +1113,20 @@ class IVRCallerApp:
             foreground="gray"
         ).pack(anchor=tk.W, pady=(0, 10))
 
-        # Номер шаблона СМС
+        # Номер шаблона СМС (условно обязательное поле)
         template_frame = ttk.Frame(params_frame)
         template_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(
+        self.template_label = ttk.Label(
             template_frame,
             text="Номер шаблона СМС:",
             font=("Segoe UI", 10)
-        ).pack(side=tk.LEFT, padx=(0, 10))
+        )
+        self.template_label.pack(side=tk.LEFT, padx=(0, 10))
 
         self.sms_template = tk.StringVar()
-        ttk.Entry(template_frame, textvariable=self.sms_template, width=20, font=("Consolas", 10)).pack(side=tk.LEFT)
+        self.sms_template_entry = ttk.Entry(template_frame, textvariable=self.sms_template, width=20, font=("Consolas", 10))
+        self.sms_template_entry.pack(side=tk.LEFT)
 
         # Отложенная отправка
         delayed_frame = ttk.Frame(params_frame)
@@ -1181,14 +1183,25 @@ class IVRCallerApp:
             # Позвонить - только поле озвучивания
             self.voice_text.config(state='normal', bg='white')
             self.sms_text.config(state='disabled', bg='#f0f0f0')
+            # Номер шаблона СМС не требуется
+            self.sms_template_entry.config(state='disabled')
+            self.template_label.config(text="Номер шаблона СМС:")
+
         elif alert_type == "sms":
             # Отправить СМС - только поле СМС
             self.voice_text.config(state='disabled', bg='#f0f0f0')
             self.sms_text.config(state='normal', bg='white')
+            # Номер шаблона СМС обязателен
+            self.sms_template_entry.config(state='normal')
+            self.template_label.config(text="Номер шаблона СМС: *", font=("Segoe UI", 10, "bold"))
+
         elif alert_type == "call_sms":
             # Позвонить и отправить СМС - оба поля
             self.voice_text.config(state='normal', bg='white')
             self.sms_text.config(state='normal', bg='white')
+            # Номер шаблона СМС обязателен
+            self.sms_template_entry.config(state='normal')
+            self.template_label.config(text="Номер шаблона СМС: *", font=("Segoe UI", 10, "bold"))
 
     def validate_sender_phone(self, *args):
         """Валидация номера отправителя"""
@@ -1811,13 +1824,21 @@ class IVRCallerApp:
             messagebox.showwarning("Внимание", "Заполните хотя бы одно текстовое поле!\n\n(Текст для озвучивания или текст для СМС)")
             return
 
-        # Валидация номера отправителя
+        # Валидация номера отправителя (обязательное поле)
         sender_phone = self.sender_phone.get().strip()
         if not sender_phone or len(sender_phone) != 11 or not sender_phone.startswith('7'):
-            messagebox.showwarning("Внимание", "Некорректный номер отправителя!\n\nДолжен быть 11 цифр, начинается с 7")
+            messagebox.showwarning("Внимание", "Заполните обязательное поле!\n\n'Номер с которого совершать вызов'\nДолжен быть 11 цифр, начинается с 7")
             return
 
-        alert_type = ALERT_TYPES[self.selected_alert_type.get()]
+        alert_type_key = self.selected_alert_type.get()
+        alert_type = ALERT_TYPES[alert_type_key]
+
+        # Валидация номера шаблона СМС для типов "sms" и "call_sms"
+        sms_template = self.sms_template.get().strip()
+        if alert_type_key in ["sms", "call_sms"]:
+            if not sms_template:
+                messagebox.showwarning("Внимание", "Заполните обязательное поле!\n\n'Номер шаблона СМС' обязателен для этого типа оповещения")
+                return
 
         # Формируем phones_data с часовыми поясами
         phones_data = []
@@ -1934,7 +1955,9 @@ class IVRCallerApp:
             phone_info = campaign_extra.get('phones_data', [])[i] if campaign_extra else {}
             timezone = phone_info.get('timezone', '+0') if isinstance(phone_info, dict) else '+0'
             voice_text = campaign_extra.get('voice_text', '') if campaign_extra else ''
+            sms_text = campaign_extra.get('sms_text', '') if campaign_extra else ''
             sender_phone = campaign_extra.get('sender_phone', '') if campaign_extra else ''
+            sms_template = campaign_extra.get('sms_template', '') if campaign_extra else ''
 
             # Получаем ключ типа оповещения из ALERT_TYPES
             alert_type_key = None
@@ -1947,7 +1970,9 @@ class IVRCallerApp:
                 phone=emp["phone"],
                 timezone=timezone,
                 voice_text=voice_text,
+                sms_text=sms_text,
                 sender_phone=sender_phone,
+                sms_template=sms_template,
                 alert_type_key=alert_type_key or 'call'
             )
 
@@ -1996,15 +2021,17 @@ class IVRCallerApp:
         else:
             messagebox.showwarning("Внимание", f"Успешно: {success}\nОшибок: {fail}")
 
-    def send_single_request(self, phone, timezone, voice_text, sender_phone, alert_type_key):
+    def send_single_request(self, phone, timezone, voice_text, sms_text, sender_phone, sms_template, alert_type_key):
         """
-        Отправка запроса на API для типа "Позвонить"
+        Отправка запроса на API
 
         Args:
             phone: Номер телефона (ANI)
             timezone: Часовой пояс (TZ_DBID) из файла, например "+3"
             voice_text: Текст для озвучивания
-            sender_phone: Номер отправителя (CPD)
+            sms_text: Текст СМС
+            sender_phone: Номер отправителя (CPN)
+            sms_template: Номер шаблона СМС
             alert_type_key: Тип оповещения ("call", "call_sms", "sms")
 
         Returns:
@@ -2022,6 +2049,7 @@ class IVRCallerApp:
 
             # Формируем ADD_PROP в зависимости от типа
             add_prop = {}
+            service = "MONITOR_BANK"  # По умолчанию
 
             if alert_type_key == "call":
                 # Только звонок
@@ -2029,14 +2057,25 @@ class IVRCallerApp:
                     "text_voice": voice_text,
                     "CPN": sender_phone
                 }
+                service = "MONITOR_BANK"
+
+            elif alert_type_key == "call_sms":
+                # Звонок + СМС
+                add_prop = {
+                    "text_voice": voice_text,
+                    "CPN": sender_phone,
+                    "sms_text": sms_text,
+                    "template": sms_template
+                }
+                service = "IVR_Quality_Control"
 
             # Формируем данные запроса
             data = {
                 "ANI": phone,
                 "CONNID": connid,
                 "TZ_DBID": tz_dbid,
-                "CUSTID": "499287966839",  # Как в примере
-                "SERVICE": "MONITOR_BANK",
+                "CUSTID": "499287966839",
+                "SERVICE": service,
                 "DELAY": "1",
                 "ADD_PROP": json.dumps(add_prop, ensure_ascii=False)
             }
