@@ -880,6 +880,9 @@ class IVRCallerApp:
         self.setup_ui()
         self.center_window()
 
+        # Запускаем проверку отложенных кампаний
+        self.root.after(5000, self.check_scheduled_campaigns)
+
     def _load_connid(self):
         try:
             if os.path.exists(CONNID_FILE):
@@ -1128,6 +1131,15 @@ class IVRCallerApp:
         self.sms_template_entry = ttk.Entry(template_frame, textvariable=self.sms_template, width=20, font=("Consolas", 10))
         self.sms_template_entry.pack(side=tk.LEFT)
 
+        # Подсказка для шаблона СМС
+        self.template_hint = ttk.Label(
+            params_frame,
+            text="",
+            font=("Segoe UI", 9),
+            foreground="gray"
+        )
+        self.template_hint.pack(anchor=tk.W, pady=(0, 10))
+
         # Отложенная отправка
         delayed_frame = ttk.Frame(params_frame)
         delayed_frame.pack(fill=tk.X, pady=(5, 0))
@@ -1186,6 +1198,7 @@ class IVRCallerApp:
             # Номер шаблона СМС не требуется
             self.sms_template_entry.config(state='disabled')
             self.template_label.config(text="Номер шаблона СМС:")
+            self.template_hint.config(text="💡 Поле недоступно для типа 'Позвонить' (не требуется)", foreground="gray")
 
         elif alert_type == "sms":
             # Отправить СМС - только поле СМС
@@ -1194,6 +1207,7 @@ class IVRCallerApp:
             # Номер шаблона СМС обязателен
             self.sms_template_entry.config(state='normal')
             self.template_label.config(text="Номер шаблона СМС: *", font=("Segoe UI", 10, "bold"))
+            self.template_hint.config(text="💡 Обязательное поле для типа 'Отправить СМС'", foreground="green")
 
         elif alert_type == "call_sms":
             # Позвонить и отправить СМС - оба поля
@@ -1202,6 +1216,7 @@ class IVRCallerApp:
             # Номер шаблона СМС обязателен
             self.sms_template_entry.config(state='normal')
             self.template_label.config(text="Номер шаблона СМС: *", font=("Segoe UI", 10, "bold"))
+            self.template_hint.config(text="💡 Обязательное поле для типа 'Позвонить и отправить СМС'", foreground="green")
 
     def validate_sender_phone(self, *args):
         """Валидация номера отправителя"""
@@ -1930,26 +1945,35 @@ class IVRCallerApp:
             if messagebox.askyesno("Подтверждение", confirm_text):
                 self.send_alerts(employees_to_call, alert_type, "Конструктор", campaign_extra)
 
-    def send_alerts(self, employees, alert_type, source, campaign_extra=None):
+    def send_alerts(self, employees, alert_type, source, campaign_extra=None, show_ui=True):
         success, fail = 0, 0
         requests_log = []
 
-        progress = tk.Toplevel(self.root)
-        progress.title("Отправка...")
-        progress.geometry("350x120")
-        progress.transient(self.root)
-        progress.grab_set()
+        # Создаем прогресс-окно только если show_ui=True
+        if show_ui:
+            progress = tk.Toplevel(self.root)
+            progress.title("Отправка...")
+            progress.geometry("350x120")
+            progress.transient(self.root)
+            progress.grab_set()
 
-        label = ttk.Label(progress, text="Отправка...", font=("Segoe UI", 10))
-        label.pack(pady=20)
+            label = ttk.Label(progress, text="Отправка...", font=("Segoe UI", 10))
+            label.pack(pady=20)
+        else:
+            progress = None
+            label = None
 
-        bar = ttk.Progressbar(progress, length=300, maximum=len(employees))
-        bar.pack(pady=10)
+        if show_ui:
+            bar = ttk.Progressbar(progress, length=300, maximum=len(employees))
+            bar.pack(pady=10)
+        else:
+            bar = None
 
         for i, emp in enumerate(employees):
-            label.config(text=f"Отправка: {emp['name']}...")
-            bar["value"] = i + 1
-            progress.update()
+            if show_ui:
+                label.config(text=f"Отправка: {emp['name']}...")
+                bar["value"] = i + 1
+                progress.update()
 
             # Получаем данные для запроса
             phone_info = campaign_extra.get('phones_data', [])[i] if campaign_extra else {}
@@ -1994,8 +2018,9 @@ class IVRCallerApp:
                 fail += 1
                 self._log_action("FAIL", f"{source} | {emp['name']} | {emp['phone']}")
 
-        progress.destroy()
-        self.status_label.config(text=f"CONNID: {self.current_connid} | ✅{success} ❌{fail}")
+        if show_ui:
+            progress.destroy()
+            self.status_label.config(text=f"CONNID: {self.current_connid} | ✅{success} ❌{fail}")
 
         # Сохраняем в историю
         campaign_data = {
@@ -2016,10 +2041,105 @@ class IVRCallerApp:
 
         self.add_campaign_to_history(campaign_data)
 
-        if fail == 0:
-            messagebox.showinfo("Успех", f"Отправлено: {success}")
-        else:
-            messagebox.showwarning("Внимание", f"Успешно: {success}\nОшибок: {fail}")
+        if show_ui:
+            if fail == 0:
+                messagebox.showinfo("Успех", f"Отправлено: {success}")
+            else:
+                messagebox.showwarning("Внимание", f"Успешно: {success}\nОшибок: {fail}")
+
+    def check_scheduled_campaigns(self):
+        """Проверяет и запускает отложенные кампании"""
+        try:
+            if not os.path.exists(HISTORY_FILE):
+                return
+
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                campaigns = json.load(f)
+
+            current_time = datetime.now()
+            campaigns_to_update = []
+
+            for campaign in campaigns:
+                # Проверяем только кампании в очереди
+                if campaign.get("status") != "queued":
+                    continue
+
+                scheduled_time_str = campaign.get("scheduled_time")
+                if not scheduled_time_str:
+                    continue
+
+                # Парсим запланированное время
+                try:
+                    scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M")
+                except ValueError:
+                    continue
+
+                # Если время наступило, запускаем кампанию
+                if current_time >= scheduled_time:
+                    # Получаем данные для запуска
+                    phones_data = campaign.get("phones_data", [])
+                    alert_type_name = campaign.get("alert_type", "Позвонить")
+
+                    # Находим соответствующий тип оповещения
+                    alert_type = None
+                    for key, alert in ALERT_TYPES.items():
+                        if alert['name'] == alert_type_name:
+                            alert_type = alert
+                            break
+
+                    if not alert_type or not phones_data:
+                        continue
+
+                    # Формируем список для отправки
+                    employees_to_call = []
+                    for phone_info in phones_data:
+                        employees_to_call.append({
+                            "name": phone_info.get("number", ""),
+                            "phone": phone_info.get("number", "")
+                        })
+
+                    # Подготавливаем campaign_extra
+                    campaign_extra = {
+                        "voice_text": campaign.get("voice_text", ""),
+                        "sms_text": campaign.get("sms_text", ""),
+                        "sender_phone": campaign.get("sender_phone", ""),
+                        "sms_template": campaign.get("sms_template", ""),
+                        "phones_data": phones_data
+                    }
+
+                    # Запускаем отправку (без UI подтверждения)
+                    try:
+                        self.send_alerts(employees_to_call, alert_type, "Автозапуск (Отложенная отправка)", campaign_extra, show_ui=False)
+                        # Отмечаем кампанию как запущенную
+                        campaign["status"] = "completed"
+                        campaign["launched"] = True
+                        campaigns_to_update.append(campaign)
+                    except Exception as e:
+                        print(f"Ошибка запуска отложенной кампании: {e}")
+                        campaign["status"] = "failed"
+                        campaign["error"] = str(e)
+                        campaigns_to_update.append(campaign)
+
+            # Обновляем статусы кампаний в файле
+            if campaigns_to_update:
+                for updated_campaign in campaigns_to_update:
+                    for i, campaign in enumerate(campaigns):
+                        if campaign.get("id") == updated_campaign.get("id"):
+                            campaigns[i] = updated_campaign
+                            break
+
+                with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+                    json.dump(campaigns, f, ensure_ascii=False, indent=4)
+
+                # Обновляем отображение истории
+                self.refresh_queued_history()
+                self.refresh_completed_history()
+
+        except Exception as e:
+            print(f"Ошибка проверки отложенных кампаний: {e}")
+
+        # Запланировать следующую проверку через 60 секунд
+        self.root.after(60000, self.check_scheduled_campaigns)
 
     def send_single_request(self, phone, timezone, voice_text, sms_text, sender_phone, sms_template, alert_type_key):
         """
