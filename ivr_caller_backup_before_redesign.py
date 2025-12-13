@@ -34,98 +34,23 @@ CONNID_FILE = os.path.join(BASE_DIR, "connid.txt")
 LOG_FILE = os.path.join(BASE_DIR, "ivr_log.txt")
 DEBUG_LOG_FILE = os.path.join(BASE_DIR, "debug.log")
 HISTORY_FILE = os.path.join(BASE_DIR, "campaigns_history.json")
-THEME_FILE = os.path.join(BASE_DIR, "theme.txt")
-# ===========================================
-
-
-# ============== ДИЗАЙН-СИСТЕМА МТС ==============
-class MTSTheme:
-    """Управление темами оформления в стиле МТС"""
-
-    # Светлая тема (по умолчанию)
-    LIGHT = {
-        'bg': '#FFFFFF',
-        'fg': '#333333',
-        'primary': '#E30611',  # Красный МТС
-        'primary_hover': '#C5050C',
-        'secondary': '#F5F5F5',
-        'border': '#E0E0E0',
-        'card_bg': '#FFFFFF',
-        'card_shadow': '#00000015',
-        'success': '#28A745',
-        'warning': '#FFC107',
-        'error': '#DC3545',
-        'text_muted': '#6C757D',
-        'input_bg': '#FFFFFF',
-        'header_bg': '#E30611',
-        'header_fg': '#FFFFFF'
-    }
-
-    # Темная тема
-    DARK = {
-        'bg': '#1E1E1E',
-        'fg': '#E0E0E0',
-        'primary': '#FF0019',  # Яркий красный для темной темы
-        'primary_hover': '#FF3340',
-        'secondary': '#2D2D2D',
-        'border': '#404040',
-        'card_bg': '#252525',
-        'card_shadow': '#00000040',
-        'success': '#2ECC71',
-        'warning': '#F39C12',
-        'error': '#E74C3C',
-        'text_muted': '#95A5A6',
-        'input_bg': '#2D2D2D',
-        'header_bg': '#252525',
-        'header_fg': '#FFFFFF'
-    }
-
-    @staticmethod
-    def load_theme():
-        """Загрузить текущую тему из файла"""
-        try:
-            if os.path.exists(THEME_FILE):
-                with open(THEME_FILE, 'r') as f:
-                    theme = f.read().strip()
-                    return theme if theme in ['light', 'dark'] else 'light'
-        except:
-            pass
-        return 'light'
-
-    @staticmethod
-    def save_theme(theme):
-        """Сохранить текущую тему в файл"""
-        try:
-            with open(THEME_FILE, 'w') as f:
-                f.write(theme)
-        except:
-            pass
-
-    @staticmethod
-    def get_colors(theme='light'):
-        """Получить цвета для указанной темы"""
-        return MTSTheme.DARK if theme == 'dark' else MTSTheme.LIGHT
-
 # ===========================================
 
 
 # ============== ТИПЫ ОПОВЕЩЕНИЙ ==============
 ALERT_TYPES = {
     "call": {
-        "name": "☎ Позвонить",
-        "icon": "☎",
+        "name": "📞 Позвонить",
         "service": "MONITOR_BANK",
         "monitor_bank_id": "1"
     },
     "call_sms": {
-        "name": "⚡ Позвонить и отправить СМС",
-        "icon": "⚡",
+        "name": "📞📱 Позвонить и отправить СМС",
         "service": "MONITOR_BANK",
         "monitor_bank_id": "1"
     },
     "sms": {
-        "name": "✉ Отправить СМС",
-        "icon": "✉",
+        "name": "📱 Отправить СМС",
         "service": "MONITOR_BANK",
         "monitor_bank_id": "1"
     },
@@ -968,24 +893,17 @@ class IVRCallerApp:
 
     def __init__(self, root, username=None):
         self.root = root
-        self.root.title("МТС Outbound Manager")
-        self.root.geometry("850x700")
+        self.root.title("📞 Outbound Manager")
+        self.root.geometry("750x650")
         self.root.resizable(True, True)
-        self.root.minsize(750, 600)
-
-        # Загрузка темы
-        self.current_theme = MTSTheme.load_theme()
-        self.colors = MTSTheme.get_colors(self.current_theme)
-
-        # Применение цветов к окну
-        self.root.configure(bg=self.colors['bg'])
+        self.root.minsize(650, 550)
 
         # Конфигурация
         self.config = Config(CONFIG_FILE)
 
         # Debug logger
         self.debug_logger = DebugLogger()
-        self.debug_logger.info("Приложение запущено", {"version": "v5", "user": username, "theme": self.current_theme})
+        self.debug_logger.info("Приложение запущено", {"version": "v5", "user": username})
 
         # Загрузчик данных
         self.data_loader = DataLoader(self.config)
@@ -1038,234 +956,64 @@ class IVRCallerApp:
         y = (self.root.winfo_screenheight() // 2) - (h // 2)
         self.root.geometry(f"+{x}+{y}")
 
-    def create_card(self, parent, title=None, padx=20, pady=10):
-        """Создает карточку с рамкой и отступами в стиле МТС"""
-        # Внешний контейнер для отступов
-        card_container = tk.Frame(parent, bg=self.colors['bg'])
-        card_container.pack(fill=tk.BOTH, expand=True, padx=padx, pady=pady)
-
-        # Карточка с границей
-        card = tk.Frame(
-            card_container,
-            bg=self.colors['card_bg'],
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        card.pack(fill=tk.BOTH, expand=True)
-
-        # Заголовок карточки (опционально)
-        if title:
-            title_frame = tk.Frame(card, bg=self.colors['card_bg'])
-            title_frame.pack(fill=tk.X, padx=15, pady=(12, 8))
-
-            tk.Label(
-                title_frame,
-                text=title,
-                font=("Roboto", 12, "bold"),
-                bg=self.colors['card_bg'],
-                fg=self.colors['fg']
-            ).pack(side=tk.LEFT)
-
-            # Разделитель
-            separator = tk.Frame(card, bg=self.colors['border'], height=1)
-            separator.pack(fill=tk.X, padx=15)
-
-        # Контент карточки
-        content = tk.Frame(card, bg=self.colors['card_bg'])
-        content.pack(fill=tk.BOTH, expand=True, padx=15, pady=12)
-
-        return content
-
     def setup_ui(self):
-        # Header МТС с логотипом и переключателем темы
-        header_frame = tk.Frame(self.root, bg=self.colors['header_bg'], height=60)
-        header_frame.pack(fill=tk.X)
-        header_frame.pack_propagate(False)
+        # Логотип МТС
+        logo_frame = tk.Frame(self.root, bg="#E30611", height=50)
+        logo_frame.pack(fill=tk.X)
+        logo_frame.pack_propagate(False)
 
-        # Логотип МТС - красный квадрат с белым текстом
-        logo_container = tk.Frame(header_frame, bg=self.colors['header_bg'])
-        logo_container.pack(side=tk.LEFT, padx=20, pady=10)
-
-        # Красный квадрат с логотипом МТС
-        logo_label = tk.Label(
-            logo_container,
+        tk.Label(
+            logo_frame,
             text="МТС",
-            font=("Arial", 24, "bold"),
+            font=("Arial", 28, "bold"),
             bg="#E30611",
-            fg="#FFFFFF",
-            padx=12,
-            pady=8
-        )
-        logo_label.pack(side=tk.LEFT)
+            fg="white"
+        ).pack(side=tk.LEFT, padx=15, pady=5)
 
-        # Название приложения
         tk.Label(
-            logo_container,
-            text="Outbound Manager",
-            font=("Roboto", 13),
-            bg=self.colors['header_bg'],
-            fg=self.colors['header_fg']
-        ).pack(side=tk.LEFT, padx=(12, 0))
+            logo_frame,
+            text="Outbound Manager v5",
+            font=("Segoe UI", 11),
+            bg="#E30611",
+            fg="white"
+        ).pack(side=tk.LEFT, padx=(0, 15), pady=5)
 
-        # Переключатель темы
-        theme_frame = tk.Frame(header_frame, bg=self.colors['header_bg'])
-        theme_frame.pack(side=tk.RIGHT, padx=20)
+        # Верхняя панель
+        info_frame = ttk.Frame(self.root)
+        info_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
 
-        theme_btn = tk.Button(
-            theme_frame,
-            text="◐ Сменить тему",
-            font=("Roboto", 10),
-            bg=self.colors['header_bg'],
-            fg=self.colors['header_fg'],
-            activebackground=self.colors['primary_hover'],
-            activeforeground=self.colors['header_fg'],
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=15,
-            pady=8,
-            command=self.toggle_theme
-        )
-        theme_btn.pack()
-
-        # Информационная панель
-        info_frame = tk.Frame(self.root, bg=self.colors['bg'])
-        info_frame.pack(fill=tk.X, padx=20, pady=(15, 10))
-
-        source_icon = "✓" if self.data_source != "Тестовые данные" else "⚠"
-        info_label = tk.Label(
+        source_icon = "✅" if self.data_source != "Тестовые данные" else "⚠️"
+        ttk.Label(
             info_frame,
-            text=f"{source_icon} Источник: {self.data_source}  •  Сотрудников: {len(self.employees)}",
-            font=("Roboto", 10),
-            bg=self.colors['bg'],
-            fg=self.colors['text_muted']
-        )
-        info_label.pack(side=tk.LEFT)
+            text=f"{source_icon} Источник: {self.data_source} | Сотрудников: {len(self.employees)}",
+            font=("Segoe UI", 9),
+            foreground="gray"
+        ).pack(side=tk.LEFT)
 
-        refresh_btn = tk.Button(
-            info_frame,
-            text="↻ Обновить",
-            font=("Roboto", 10),
-            bg=self.colors['primary'],
-            fg="white",
-            activebackground=self.colors['primary_hover'],
-            activeforeground="white",
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=15,
-            pady=6,
-            command=self.refresh_employees
-        )
-        refresh_btn.pack(side=tk.RIGHT)
-
-        # Dashboard с метриками кампаний
-        dashboard_container = tk.Frame(self.root, bg=self.colors['bg'])
-        dashboard_container.pack(fill=tk.X, padx=20, pady=(10, 10))
-
-        # Загрузка метрик
-        queued_count, completed_count, total_sent = self.get_dashboard_metrics()
-
-        # Карточки метрик в одной строке
-        metrics_frame = tk.Frame(dashboard_container, bg=self.colors['bg'])
-        metrics_frame.pack(fill=tk.X)
-
-        # Метрика 1: В очереди
-        metric1 = tk.Frame(
-            metrics_frame,
-            bg=self.colors['card_bg'],
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        metric1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
-        tk.Label(
-            metric1,
-            text=str(queued_count),
-            font=("Roboto", 28, "bold"),
-            bg=self.colors['card_bg'],
-            fg=self.colors['primary']
-        ).pack(pady=(15, 5))
-        tk.Label(
-            metric1,
-            text="В очереди",
-            font=("Roboto", 10),
-            bg=self.colors['card_bg'],
-            fg=self.colors['text_muted']
-        ).pack(pady=(0, 15))
-
-        # Метрика 2: Завершено
-        metric2 = tk.Frame(
-            metrics_frame,
-            bg=self.colors['card_bg'],
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        metric2.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
-        tk.Label(
-            metric2,
-            text=str(completed_count),
-            font=("Roboto", 28, "bold"),
-            bg=self.colors['card_bg'],
-            fg=self.colors['success']
-        ).pack(pady=(15, 5))
-        tk.Label(
-            metric2,
-            text="Завершено",
-            font=("Roboto", 10),
-            bg=self.colors['card_bg'],
-            fg=self.colors['text_muted']
-        ).pack(pady=(0, 15))
-
-        # Метрика 3: Всего отправлено
-        metric3 = tk.Frame(
-            metrics_frame,
-            bg=self.colors['card_bg'],
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        metric3.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        tk.Label(
-            metric3,
-            text=str(total_sent),
-            font=("Roboto", 28, "bold"),
-            bg=self.colors['card_bg'],
-            fg=self.colors['fg']
-        ).pack(pady=(15, 5))
-        tk.Label(
-            metric3,
-            text="Всего отправлено",
-            font=("Roboto", 10),
-            bg=self.colors['card_bg'],
-            fg=self.colors['text_muted']
-        ).pack(pady=(0, 15))
+        ttk.Button(
+            info_frame, text="🔄 Обновить",
+            command=self.refresh_employees, width=12
+        ).pack(side=tk.RIGHT)
 
         # Вкладки
         self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(10, 15))
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         self.constructor_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.constructor_frame, text="⚙ Конструктор")
+        self.notebook.add(self.constructor_frame, text="📝 Конструктор")
         self.setup_constructor_tab()
 
         self.history_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.history_frame, text="⏱ История")
+        self.notebook.add(self.history_frame, text="📜 История")
         self.setup_history_tab()
 
-        # Статус-бар с границей
-        status_border = tk.Frame(self.root, bg=self.colors['border'], height=1)
-        status_border.pack(side=tk.BOTTOM, fill=tk.X)
-
-        status_frame = tk.Frame(self.root, bg='#EEEEEE', height=40)
-        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        status_frame.pack_propagate(False)
-
-        self.status_label = tk.Label(
-            status_frame,
-            text=f"CONNID: {self.current_connid}  •  Готов к работе",
-            font=("Roboto", 10, "bold"),
-            bg='#EEEEEE',
-            fg='#333333',
-            anchor=tk.W
+        # Статус-бар
+        self.status_label = ttk.Label(
+            self.root,
+            text=f"CONNID: {self.current_connid} | Готов к работе",
+            font=("Segoe UI", 9), foreground="gray"
         )
-        self.status_label.pack(side=tk.LEFT, padx=20, pady=10)
+        self.status_label.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 10))
 
     def setup_constructor_tab(self):
         # Инициализация списка номеров
@@ -1494,21 +1242,10 @@ class IVRCallerApp:
         bottom_frame = ttk.Frame(frame_inner)
         bottom_frame.pack(fill=tk.X, padx=10, pady=10)
 
-        send_btn = tk.Button(
-            bottom_frame,
-            text="🚀 Отправить оповещения",
-            font=("Roboto", 12, "bold"),
-            bg=self.colors['primary'],
-            fg="white",
-            activebackground=self.colors['primary_hover'],
-            activeforeground="white",
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=30,
-            pady=12,
+        ttk.Button(
+            bottom_frame, text="🚀 Отправить оповещения",
             command=self.send_constructor_alerts
-        )
-        send_btn.pack(side=tk.RIGHT, pady=5)
+        ).pack(side=tk.RIGHT, ipady=5, ipadx=20)
 
         # Инициализируем состояние полей
         self.toggle_text_fields()
@@ -2767,45 +2504,6 @@ class IVRCallerApp:
             print(f"Ошибка: {phone} - {e}")
             # Возвращаем данные запроса даже при ошибке
             return (False, data if 'data' in locals() else {})
-
-    def toggle_theme(self):
-        """Переключение между светлой и темной темой"""
-        new_theme = 'dark' if self.current_theme == 'light' else 'light'
-        MTSTheme.save_theme(new_theme)
-
-        # Показываем сообщение о перезапуске
-        messagebox.showinfo(
-            "Смена темы",
-            f"Тема изменена на {'темную' if new_theme == 'dark' else 'светлую'}!\n\n"
-            f"Перезапустите приложение для применения изменений."
-        )
-
-    def get_dashboard_metrics(self):
-        """Получение метрик для Dashboard"""
-        queued_count = 0
-        completed_count = 0
-        total_sent = 0
-
-        try:
-            if os.path.exists(HISTORY_FILE):
-                with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                    history = json.load(f)
-
-                    for campaign in history:
-                        status = campaign.get("status", "")
-                        if status == "queued":
-                            queued_count += 1
-                        elif status == "completed":
-                            completed_count += 1
-
-                        # Подсчет отправленных сообщений
-                        phones = campaign.get("phones", [])
-                        if isinstance(phones, list):
-                            total_sent += len(phones)
-        except (IOError, json.JSONDecodeError):
-            pass
-
-        return queued_count, completed_count, total_sent
 
     def on_closing(self):
         self.data_loader.disconnect()
