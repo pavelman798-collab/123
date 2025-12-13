@@ -140,7 +140,7 @@ class Config:
         self.config['api'] = {'url': 'http://172.16.152.67:80/fm2/UDB/IVR_ADD_CALL_EXP'}
         self.config['settings'] = {
             'data_source': 'auto', 'db_timeout': '10',
-            'api_timeout': '30', 'php_timeout': '30', 'verify_ssl': 'false'
+            'api_timeout': '3', 'php_timeout': '30', 'verify_ssl': 'false'
         }
         with open(self.config_path, 'w', encoding='utf-8') as f:
             self.config.write(f)
@@ -176,7 +176,7 @@ class Config:
 
     @property
     def api_timeout(self):
-        return self.config.getint('settings', 'api_timeout', fallback=30)
+        return self.config.getint('settings', 'api_timeout', fallback=3)
 
     @property
     def php_timeout(self):
@@ -1163,8 +1163,8 @@ class IVRCallerApp:
         ).pack(side=tk.LEFT, padx=(0, 10))
 
         self.sender_phone = tk.StringVar()
-        sender_entry = ttk.Entry(sender_frame, textvariable=self.sender_phone, width=20, font=("Consolas", 10))
-        sender_entry.pack(side=tk.LEFT)
+        self.sender_entry = ttk.Entry(sender_frame, textvariable=self.sender_phone, width=20, font=("Consolas", 10))
+        self.sender_entry.pack(side=tk.LEFT)
 
         self.sender_validation_label = ttk.Label(sender_frame, text="", font=("Segoe UI", 9), foreground="red")
         self.sender_validation_label.pack(side=tk.LEFT, padx=(10, 0))
@@ -1258,6 +1258,8 @@ class IVRCallerApp:
             # Позвонить - только поле озвучивания
             self.voice_text.config(state='normal', bg='white')
             self.sms_text.config(state='disabled', bg='#f0f0f0')
+            # Номер отправителя нужен
+            self.sender_entry.config(state='normal')
             # Номер шаблона СМС не требуется
             self.sms_template_entry.config(state='disabled')
             self.template_label.config(text="Номер шаблона СМС:")
@@ -1267,6 +1269,8 @@ class IVRCallerApp:
             # Отправить СМС - только поле СМС
             self.voice_text.config(state='disabled', bg='#f0f0f0')
             self.sms_text.config(state='normal', bg='white')
+            # Номер отправителя не нужен для СМС
+            self.sender_entry.config(state='disabled')
             # Номер шаблона СМС обязателен
             self.sms_template_entry.config(state='normal')
             self.template_label.config(text="Номер шаблона СМС: *", font=("Segoe UI", 10, "bold"))
@@ -1276,6 +1280,8 @@ class IVRCallerApp:
             # Позвонить и отправить СМС - оба поля
             self.voice_text.config(state='normal', bg='white')
             self.sms_text.config(state='normal', bg='white')
+            # Номер отправителя нужен
+            self.sender_entry.config(state='normal')
             # Номер шаблона СМС обязателен
             self.sms_template_entry.config(state='normal')
             self.template_label.config(text="Номер шаблона СМС: *", font=("Segoe UI", 10, "bold"))
@@ -1379,6 +1385,9 @@ class IVRCallerApp:
 
         self.queued_tree.pack(fill=tk.BOTH, expand=True)
 
+        # Двойной клик для просмотра детальной информации
+        self.queued_tree.bind("<Double-Button-1>", lambda e: self.view_campaign_details("queued"))
+
         # Кнопки действий
         btn_frame = ttk.Frame(self.queued_frame)
         btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
@@ -1448,6 +1457,9 @@ class IVRCallerApp:
         self.completed_tree.column("fail", width=100, anchor=tk.CENTER)
 
         self.completed_tree.pack(fill=tk.BOTH, expand=True)
+
+        # Двойной клик для просмотра детальной информации
+        self.completed_tree.bind("<Double-Button-1>", lambda e: self.view_campaign_details("completed"))
 
         # Кнопки действий
         btn_frame = ttk.Frame(self.completed_frame)
@@ -1881,17 +1893,41 @@ class IVRCallerApp:
                 }
                 new_phones.append(phone_data)
 
-        # Добавляем к списку (без дубликатов)
+        # Добавляем к списку
         existing_numbers = [p.get('number') if isinstance(p, dict) else p for p in self.file_phones]
+
+        # Проверяем есть ли дубликаты
+        duplicates_count = sum(1 for phone_data in new_phones if phone_data['number'] in existing_numbers)
+
+        if duplicates_count > 0:
+            # Спрашиваем что делать с дублями
+            remove_duplicates = messagebox.askyesno(
+                "Обнаружены дубликаты",
+                f"Найдено дубликатов: {duplicates_count}\n\n"
+                f"Удалить дубликаты?\n\n"
+                f"ДА - добавить только уникальные номера\n"
+                f"НЕТ - добавить все номера (включая дубли)"
+            )
+        else:
+            remove_duplicates = True  # Если дублей нет, не имеет значения
+
+        added_count = 0
         for phone_data in new_phones:
-            if phone_data['number'] not in existing_numbers:
+            if remove_duplicates:
+                # Добавляем только если нет в списке
+                if phone_data['number'] not in existing_numbers:
+                    self.file_phones.append(phone_data)
+                    added_count += 1
+            else:
+                # Добавляем все
                 self.file_phones.append(phone_data)
+                added_count += 1
 
         self._update_phones_listbox()
 
         messagebox.showinfo(
             "Загружено",
-            f"Добавлено номеров: {len(new_phones)}\n"
+            f"Добавлено номеров: {added_count}\n"
             f"Всего в списке: {len(self.file_phones)}\n\n"
             f"💡 Формат файла:\n"
             f"номер;часовой_пояс\n"
