@@ -1157,86 +1157,6 @@ class IVRCallerApp:
         )
         refresh_btn.pack(side=tk.RIGHT)
 
-        # Dashboard с метриками кампаний
-        dashboard_container = tk.Frame(self.root, bg=self.colors['bg'])
-        dashboard_container.pack(fill=tk.X, padx=20, pady=(10, 10))
-
-        # Загрузка метрик
-        queued_count, completed_count, total_sent = self.get_dashboard_metrics()
-
-        # Карточки метрик в одной строке
-        metrics_frame = tk.Frame(dashboard_container, bg=self.colors['bg'])
-        metrics_frame.pack(fill=tk.X)
-
-        # Метрика 1: В очереди
-        metric1 = tk.Frame(
-            metrics_frame,
-            bg=self.colors['card_bg'],
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        metric1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
-        tk.Label(
-            metric1,
-            text=str(queued_count),
-            font=("Roboto", 28, "bold"),
-            bg=self.colors['card_bg'],
-            fg=self.colors['primary']
-        ).pack(pady=(15, 5))
-        tk.Label(
-            metric1,
-            text="В очереди",
-            font=("Roboto", 10),
-            bg=self.colors['card_bg'],
-            fg=self.colors['text_muted']
-        ).pack(pady=(0, 15))
-
-        # Метрика 2: Завершено
-        metric2 = tk.Frame(
-            metrics_frame,
-            bg=self.colors['card_bg'],
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        metric2.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
-        tk.Label(
-            metric2,
-            text=str(completed_count),
-            font=("Roboto", 28, "bold"),
-            bg=self.colors['card_bg'],
-            fg=self.colors['success']
-        ).pack(pady=(15, 5))
-        tk.Label(
-            metric2,
-            text="Завершено",
-            font=("Roboto", 10),
-            bg=self.colors['card_bg'],
-            fg=self.colors['text_muted']
-        ).pack(pady=(0, 15))
-
-        # Метрика 3: Всего отправлено
-        metric3 = tk.Frame(
-            metrics_frame,
-            bg=self.colors['card_bg'],
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        metric3.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        tk.Label(
-            metric3,
-            text=str(total_sent),
-            font=("Roboto", 28, "bold"),
-            bg=self.colors['card_bg'],
-            fg=self.colors['fg']
-        ).pack(pady=(15, 5))
-        tk.Label(
-            metric3,
-            text="Всего отправлено",
-            font=("Roboto", 10),
-            bg=self.colors['card_bg'],
-            fg=self.colors['text_muted']
-        ).pack(pady=(0, 15))
-
         # Вкладки
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(10, 15))
@@ -1271,12 +1191,12 @@ class IVRCallerApp:
         # Инициализация списка номеров
         self.file_phones = []
 
-        # Создаем Canvas с прокруткой для длинного содержимого
-        canvas = tk.Canvas(self.constructor_frame, highlightthickness=0)
+        # Создаем Canvas с прокруткой
+        canvas = tk.Canvas(self.constructor_frame, bg=self.colors['bg'], highlightthickness=0)
         scrollbar = ttk.Scrollbar(self.constructor_frame, orient="vertical", command=canvas.yview)
 
         # Внутренний фрейм для содержимого
-        frame_inner = ttk.Frame(canvas)
+        frame_inner = tk.Frame(canvas, bg=self.colors['bg'])
 
         # Конфигурация прокрутки
         frame_inner.bind(
@@ -1297,218 +1217,337 @@ class IVRCallerApp:
 
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
-        # Тип оповещения
-        alert_frame = ttk.LabelFrame(frame_inner, text="Шаг 1: Тип оповещения", padding="10")
-        alert_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        # === КАРТОЧКА 1: Тип оповещения ===
+        alert_card = self.create_card(frame_inner, title="☎ Тип оповещения", pady=15)
+
+        alert_buttons_frame = tk.Frame(alert_card, bg=self.colors['card_bg'])
+        alert_buttons_frame.pack(fill=tk.X, pady=10)
 
         col_idx = 0
         for key, alert in ALERT_TYPES.items():
-            ttk.Radiobutton(
-                alert_frame, text=alert["name"],
-                value=key, variable=self.selected_alert_type
-            ).grid(row=0, column=col_idx, padx=10, pady=5, sticky=tk.W)
+            rb_frame = tk.Frame(alert_buttons_frame, bg=self.colors['card_bg'])
+            rb_frame.grid(row=0, column=col_idx, padx=15, pady=10, sticky=tk.W)
+
+            tk.Radiobutton(
+                rb_frame,
+                text=alert["name"],
+                value=key,
+                variable=self.selected_alert_type,
+                font=("Roboto", 11),
+                bg=self.colors['card_bg'],
+                fg=self.colors['fg'],
+                selectcolor=self.colors['card_bg'],
+                activebackground=self.colors['card_bg'],
+                activeforeground=self.colors['primary'],
+                cursor="hand2"
+            ).pack()
             col_idx += 1
 
         # Добавляем trace для отслеживания изменений типа оповещения
         self.selected_alert_type.trace("w", self.toggle_text_fields)
 
-        # Текстовые поля
-        text_frame = ttk.LabelFrame(frame_inner, text="Шаг 2: Содержимое сообщений", padding="10")
-        text_frame.pack(fill=tk.X, padx=10, pady=5)
+        # === КАРТОЧКА 2: Содержимое сообщений ===
+        text_card = self.create_card(frame_inner, title="✉ Содержимое сообщений", pady=15)
 
         # Поле для озвучивания
-        ttk.Label(
-            text_frame,
-            text="📞 Текст для озвучивания при звонке:",
-            font=("Segoe UI", 10, "bold")
-        ).pack(anchor=tk.W, pady=(5, 2))
+        tk.Label(
+            text_card,
+            text="📞 Текст для озвучивания при звонке",
+            font=("Roboto", 12, "bold"),
+            bg=self.colors['card_bg'],
+            fg=self.colors['fg']
+        ).pack(anchor=tk.W, pady=(5, 8))
 
-        ttk.Label(
-            text_frame,
-            text="💡 Этот текст будет произнесён роботом при звонке получателю",
-            font=("Segoe UI", 9),
-            foreground="gray"
-        ).pack(anchor=tk.W, pady=(0, 5))
-
-        self.voice_text = tk.Text(text_frame, height=4, font=("Segoe UI", 10), wrap=tk.WORD)
-        self.voice_text.pack(fill=tk.X, pady=(0, 15))
+        self.voice_text = tk.Text(
+            text_card,
+            height=4,
+            font=("Roboto", 11),
+            wrap=tk.WORD,
+            relief=tk.SOLID,
+            borderwidth=1,
+            padx=10,
+            pady=8
+        )
+        self.voice_text.pack(fill=tk.X, pady=(0, 20))
 
         # Поле для СМС
-        ttk.Label(
-            text_frame,
-            text="📱 Текст для СМС:",
-            font=("Segoe UI", 10, "bold")
-        ).pack(anchor=tk.W, pady=(5, 2))
+        tk.Label(
+            text_card,
+            text="📱 Текст для СМС",
+            font=("Roboto", 12, "bold"),
+            bg=self.colors['card_bg'],
+            fg=self.colors['fg']
+        ).pack(anchor=tk.W, pady=(5, 8))
 
-        ttk.Label(
-            text_frame,
-            text="💡 Этот текст будет отправлен в виде SMS-сообщения",
-            font=("Segoe UI", 9),
-            foreground="gray"
-        ).pack(anchor=tk.W, pady=(0, 5))
-
-        self.sms_text = tk.Text(text_frame, height=4, font=("Segoe UI", 10), wrap=tk.WORD)
+        self.sms_text = tk.Text(
+            text_card,
+            height=4,
+            font=("Roboto", 11),
+            wrap=tk.WORD,
+            relief=tk.SOLID,
+            borderwidth=1,
+            padx=10,
+            pady=8
+        )
         self.sms_text.pack(fill=tk.X)
 
-        # Загрузка номеров из файла
-        file_load_frame = ttk.LabelFrame(frame_inner, text="Шаг 3: Загрузка номеров телефонов", padding="10")
-        file_load_frame.pack(fill=tk.X, padx=10, pady=5)
+        # === КАРТОЧКА 3: Загрузка номеров ===
+        file_card = self.create_card(frame_inner, title="📂 Загрузка номеров телефонов", pady=15)
 
         # Кнопки загрузки
-        btn_frame = ttk.Frame(file_load_frame)
-        btn_frame.pack(fill=tk.X, pady=(0, 10))
+        btn_frame = tk.Frame(file_card, bg=self.colors['card_bg'])
+        btn_frame.pack(fill=tk.X, pady=(5, 15))
 
-        ttk.Button(
-            btn_frame, text="📂 Выбрать TXT файл",
-            command=self.load_phones_from_file, width=20
-        ).pack(side=tk.LEFT, padx=(0, 10))
-
-        ttk.Button(
-            btn_frame, text="📥 Скачать пример",
-            command=self.export_example_file, width=15
-        ).pack(side=tk.LEFT, padx=(0, 10))
-
-        ttk.Button(
-            btn_frame, text="🗑️ Очистить список",
-            command=self.clear_file_phones, width=15
-        ).pack(side=tk.LEFT)
-
-        self.file_count_label = ttk.Label(
-            btn_frame, text="Загружено: 0 номеров",
-            font=("Segoe UI", 10, "bold")
-        )
-        self.file_count_label.pack(side=tk.RIGHT)
-
-        # Список номеров
-        list_frame = ttk.Frame(file_load_frame)
-        list_frame.pack(fill=tk.BOTH, expand=True)
-
-        self.phones_listbox = tk.Listbox(
-            list_frame, font=("Consolas", 10),
-            selectmode=tk.EXTENDED, height=6
-        )
-        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.phones_listbox.yview)
-        self.phones_listbox.configure(yscrollcommand=scrollbar.set)
-
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.phones_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Подсказка
-        ttk.Label(
-            file_load_frame,
-            text="💡 Формат файла: один номер на строку (+79991234567)",
-            font=("Segoe UI", 9), foreground="gray"
-        ).pack(anchor=tk.W, pady=(5, 0))
-
-        # Шаг 4: Параметры кампании
-        params_frame = ttk.LabelFrame(frame_inner, text="Шаг 4: Параметры кампании", padding="10")
-        params_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        # Номер отправителя (обязательное поле)
-        sender_frame = ttk.Frame(params_frame)
-        sender_frame.pack(fill=tk.X, pady=(0, 10))
-
-        ttk.Label(
-            sender_frame,
-            text="Номер с которого совершать вызов: *",
-            font=("Segoe UI", 10, "bold")
-        ).pack(side=tk.LEFT, padx=(0, 10))
-
-        self.sender_phone = tk.StringVar()
-        self.sender_entry = ttk.Entry(sender_frame, textvariable=self.sender_phone, width=20, font=("Consolas", 10))
-        self.sender_entry.pack(side=tk.LEFT)
-
-        self.sender_validation_label = ttk.Label(sender_frame, text="", font=("Segoe UI", 9), foreground="red")
-        self.sender_validation_label.pack(side=tk.LEFT, padx=(10, 0))
-
-        # Валидация номера отправителя
-        self.sender_phone.trace("w", self.validate_sender_phone)
-
-        ttk.Label(
-            params_frame,
-            text="💡 11 цифр, начинается с 7 (например: 79991234567)",
-            font=("Segoe UI", 9),
-            foreground="gray"
-        ).pack(anchor=tk.W, pady=(0, 10))
-
-        # Номер шаблона СМС (условно обязательное поле)
-        template_frame = ttk.Frame(params_frame)
-        template_frame.pack(fill=tk.X, pady=(0, 10))
-
-        self.template_label = ttk.Label(
-            template_frame,
-            text="Номер шаблона СМС:",
-            font=("Segoe UI", 10)
-        )
-        self.template_label.pack(side=tk.LEFT, padx=(0, 10))
-
-        self.sms_template = tk.StringVar()
-        self.sms_template_entry = ttk.Entry(template_frame, textvariable=self.sms_template, width=20, font=("Consolas", 10))
-        self.sms_template_entry.pack(side=tk.LEFT)
-
-        # Подсказка для шаблона СМС
-        self.template_hint = ttk.Label(
-            params_frame,
-            text="",
-            font=("Segoe UI", 9),
-            foreground="gray"
-        )
-        self.template_hint.pack(anchor=tk.W, pady=(0, 10))
-
-        # Отложенная отправка
-        delayed_frame = ttk.Frame(params_frame)
-        delayed_frame.pack(fill=tk.X, pady=(5, 0))
-
-        self.delayed_send = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
-            delayed_frame,
-            text="Отложенная отправка",
-            variable=self.delayed_send,
-            command=self.toggle_delayed_send
-        ).pack(side=tk.LEFT)
-
-        # Поля для даты и времени
-        datetime_frame = ttk.Frame(params_frame)
-        datetime_frame.pack(fill=tk.X, pady=(5, 0))
-
-        ttk.Label(datetime_frame, text="Дата:").pack(side=tk.LEFT, padx=(20, 5))
-        self.send_date = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
-        self.date_entry = ttk.Entry(datetime_frame, textvariable=self.send_date, width=12, font=("Consolas", 10))
-        self.date_entry.pack(side=tk.LEFT, padx=(0, 15))
-        self.date_entry.config(state='disabled')
-
-        ttk.Label(datetime_frame, text="Время:").pack(side=tk.LEFT, padx=(0, 5))
-        self.send_time = tk.StringVar(value="12:00")
-        self.time_entry = ttk.Entry(datetime_frame, textvariable=self.send_time, width=8, font=("Consolas", 10))
-        self.time_entry.pack(side=tk.LEFT)
-        self.time_entry.config(state='disabled')
-
-        ttk.Label(
-            params_frame,
-            text="💡 Формат даты: ГГГГ-ММ-ДД, времени: ЧЧ:ММ",
-            font=("Segoe UI", 9),
-            foreground="gray"
-        ).pack(anchor=tk.W, pady=(5, 0))
-
-        # Нижняя панель - кнопка отправки
-        bottom_frame = ttk.Frame(frame_inner)
-        bottom_frame.pack(fill=tk.X, padx=10, pady=10)
-
-        send_btn = tk.Button(
-            bottom_frame,
-            text="🚀 Отправить оповещения",
-            font=("Roboto", 12, "bold"),
+        tk.Button(
+            btn_frame,
+            text="📂 Выбрать файл",
+            font=("Roboto", 11, "bold"),
             bg=self.colors['primary'],
             fg="white",
             activebackground=self.colors['primary_hover'],
             activeforeground="white",
             relief=tk.FLAT,
             cursor="hand2",
-            padx=30,
-            pady=12,
+            padx=20,
+            pady=10,
+            command=self.load_phones_from_file
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        tk.Button(
+            btn_frame,
+            text="📥 Пример",
+            font=("Roboto", 11),
+            bg=self.colors['secondary'],
+            fg=self.colors['fg'],
+            activebackground=self.colors['border'],
+            activeforeground=self.colors['fg'],
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=20,
+            pady=10,
+            command=self.export_example_file
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        tk.Button(
+            btn_frame,
+            text="🗑️ Очистить",
+            font=("Roboto", 11),
+            bg=self.colors['secondary'],
+            fg=self.colors['fg'],
+            activebackground=self.colors['border'],
+            activeforeground=self.colors['fg'],
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=20,
+            pady=10,
+            command=self.clear_file_phones
+        ).pack(side=tk.LEFT)
+
+        self.file_count_label = tk.Label(
+            btn_frame,
+            text="Загружено: 0 номеров",
+            font=("Roboto", 11, "bold"),
+            bg=self.colors['card_bg'],
+            fg=self.colors['primary']
+        )
+        self.file_count_label.pack(side=tk.RIGHT)
+
+        # Список номеров
+        list_frame = tk.Frame(file_card, bg=self.colors['card_bg'])
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+        self.phones_listbox = tk.Listbox(
+            list_frame,
+            font=("Consolas", 10),
+            selectmode=tk.EXTENDED,
+            height=6,
+            relief=tk.SOLID,
+            borderwidth=1
+        )
+        scrollbar_list = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.phones_listbox.yview)
+        self.phones_listbox.configure(yscrollcommand=scrollbar_list.set)
+
+        scrollbar_list.pack(side=tk.RIGHT, fill=tk.Y)
+        self.phones_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Подсказка
+        tk.Label(
+            file_card,
+            text="💡 Формат файла: один номер на строку (+79991234567;+3)",
+            font=("Roboto", 10),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text_muted']
+        ).pack(anchor=tk.W)
+
+        # === КАРТОЧКА 4: Параметры кампании ===
+        params_card = self.create_card(frame_inner, title="⚙ Параметры кампании", pady=15)
+
+        # Номер отправителя
+        tk.Label(
+            params_card,
+            text="Номер с которого совершать вызов *",
+            font=("Roboto", 12, "bold"),
+            bg=self.colors['card_bg'],
+            fg=self.colors['fg']
+        ).pack(anchor=tk.W, pady=(5, 8))
+
+        sender_frame = tk.Frame(params_card, bg=self.colors['card_bg'])
+        sender_frame.pack(fill=tk.X, pady=(0, 5))
+
+        self.sender_phone = tk.StringVar()
+        self.sender_entry = tk.Entry(
+            sender_frame,
+            textvariable=self.sender_phone,
+            font=("Consolas", 12),
+            relief=tk.SOLID,
+            borderwidth=1,
+            width=25
+        )
+        self.sender_entry.pack(side=tk.LEFT, ipady=5)
+
+        self.sender_validation_label = tk.Label(
+            sender_frame,
+            text="",
+            font=("Roboto", 10),
+            bg=self.colors['card_bg']
+        )
+        self.sender_validation_label.pack(side=tk.LEFT, padx=(10, 0))
+
+        # Валидация номера отправителя
+        self.sender_phone.trace("w", self.validate_sender_phone)
+
+        tk.Label(
+            params_card,
+            text="💡 11 цифр, начинается с 7 (например: 79991234567)",
+            font=("Roboto", 10),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text_muted']
+        ).pack(anchor=tk.W, pady=(0, 15))
+
+        # Номер шаблона СМС
+        self.template_label = tk.Label(
+            params_card,
+            text="Номер шаблона СМС",
+            font=("Roboto", 12, "bold"),
+            bg=self.colors['card_bg'],
+            fg=self.colors['fg']
+        )
+        self.template_label.pack(anchor=tk.W, pady=(5, 8))
+
+        template_frame = tk.Frame(params_card, bg=self.colors['card_bg'])
+        template_frame.pack(fill=tk.X, pady=(0, 5))
+
+        self.sms_template = tk.StringVar()
+        self.sms_template_entry = tk.Entry(
+            template_frame,
+            textvariable=self.sms_template,
+            font=("Consolas", 12),
+            relief=tk.SOLID,
+            borderwidth=1,
+            width=25
+        )
+        self.sms_template_entry.pack(side=tk.LEFT, ipady=5)
+
+        # Подсказка для шаблона СМС
+        self.template_hint = tk.Label(
+            params_card,
+            text="",
+            font=("Roboto", 10),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text_muted']
+        )
+        self.template_hint.pack(anchor=tk.W, pady=(0, 15))
+
+        # Отложенная отправка
+        delayed_frame = tk.Frame(params_card, bg=self.colors['card_bg'])
+        delayed_frame.pack(fill=tk.X, pady=(10, 10))
+
+        self.delayed_send = tk.BooleanVar(value=False)
+        tk.Checkbutton(
+            delayed_frame,
+            text="Отложенная отправка",
+            variable=self.delayed_send,
+            font=("Roboto", 11),
+            bg=self.colors['card_bg'],
+            fg=self.colors['fg'],
+            selectcolor=self.colors['card_bg'],
+            activebackground=self.colors['card_bg'],
+            activeforeground=self.colors['primary'],
+            cursor="hand2",
+            command=self.toggle_delayed_send
+        ).pack(side=tk.LEFT)
+
+        # Поля для даты и времени
+        datetime_frame = tk.Frame(params_card, bg=self.colors['card_bg'])
+        datetime_frame.pack(fill=tk.X, pady=(5, 5))
+
+        tk.Label(
+            datetime_frame,
+            text="Дата:",
+            font=("Roboto", 11),
+            bg=self.colors['card_bg'],
+            fg=self.colors['fg']
+        ).pack(side=tk.LEFT, padx=(20, 8))
+
+        self.send_date = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
+        self.date_entry = tk.Entry(
+            datetime_frame,
+            textvariable=self.send_date,
+            font=("Consolas", 11),
+            relief=tk.SOLID,
+            borderwidth=1,
+            width=12
+        )
+        self.date_entry.pack(side=tk.LEFT, ipady=3, padx=(0, 20))
+        self.date_entry.config(state='disabled')
+
+        tk.Label(
+            datetime_frame,
+            text="Время:",
+            font=("Roboto", 11),
+            bg=self.colors['card_bg'],
+            fg=self.colors['fg']
+        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        self.send_time = tk.StringVar(value="12:00")
+        self.time_entry = tk.Entry(
+            datetime_frame,
+            textvariable=self.send_time,
+            font=("Consolas", 11),
+            relief=tk.SOLID,
+            borderwidth=1,
+            width=8
+        )
+        self.time_entry.pack(side=tk.LEFT, ipady=3)
+        self.time_entry.config(state='disabled')
+
+        tk.Label(
+            params_card,
+            text="💡 Формат даты: ГГГГ-ММ-ДД, времени: ЧЧ:ММ",
+            font=("Roboto", 10),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text_muted']
+        ).pack(anchor=tk.W, pady=(5, 0))
+
+        # === КНОПКА ОТПРАВКИ ===
+        bottom_container = tk.Frame(frame_inner, bg=self.colors['bg'])
+        bottom_container.pack(fill=tk.X, padx=20, pady=20)
+
+        send_btn = tk.Button(
+            bottom_container,
+            text="🚀 Отправить оповещения",
+            font=("Roboto", 14, "bold"),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=40,
+            pady=15,
             command=self.send_constructor_alerts
         )
-        send_btn.pack(side=tk.RIGHT, pady=5)
+        send_btn.pack(side=tk.RIGHT)
 
         # Инициализируем состояние полей
         self.toggle_text_fields()
@@ -1612,9 +1651,19 @@ class IVRCallerApp:
         self.queued_search_var.trace("w", lambda *args: self.refresh_queued_history())
         ttk.Entry(search_frame, textvariable=self.queued_search_var, width=20).pack(side=tk.LEFT, padx=(0, 10))
 
-        ttk.Button(
-            search_frame, text="🔄 Обновить",
-            command=self.refresh_queued_history, width=12
+        tk.Button(
+            search_frame,
+            text="🔄 Обновить",
+            font=("Roboto", 10, "bold"),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=6,
+            command=self.refresh_queued_history
         ).pack(side=tk.RIGHT)
 
         # Таблица
@@ -1655,18 +1704,48 @@ class IVRCallerApp:
         btn_frame = ttk.Frame(self.queued_frame)
         btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
 
-        ttk.Button(
-            btn_frame, text="👁️ Просмотреть",
+        tk.Button(
+            btn_frame,
+            text="👁️ Просмотреть",
+            font=("Roboto", 10, "bold"),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
             command=lambda: self.view_campaign_details("queued")
         ).pack(side=tk.LEFT, padx=(0, 10))
 
-        ttk.Button(
-            btn_frame, text="📄 Экспорт запросов",
+        tk.Button(
+            btn_frame,
+            text="📄 Экспорт запросов",
+            font=("Roboto", 10, "bold"),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
             command=lambda: self.export_campaign_requests("queued")
         ).pack(side=tk.LEFT, padx=(0, 10))
 
-        ttk.Button(
-            btn_frame, text="🗑️ Удалить из очереди",
+        tk.Button(
+            btn_frame,
+            text="🗑️ Удалить из очереди",
+            font=("Roboto", 10, "bold"),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
             command=self.delete_queued_campaign
         ).pack(side=tk.LEFT)
 
@@ -1683,9 +1762,19 @@ class IVRCallerApp:
         self.completed_search_var.trace("w", lambda *args: self.refresh_completed_history())
         ttk.Entry(search_frame, textvariable=self.completed_search_var, width=20).pack(side=tk.LEFT, padx=(0, 10))
 
-        ttk.Button(
-            search_frame, text="🔄 Обновить",
-            command=self.refresh_completed_history, width=12
+        tk.Button(
+            search_frame,
+            text="🔄 Обновить",
+            font=("Roboto", 10, "bold"),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=6,
+            command=self.refresh_completed_history
         ).pack(side=tk.RIGHT)
 
         # Таблица
@@ -1728,13 +1817,33 @@ class IVRCallerApp:
         btn_frame = ttk.Frame(self.completed_frame)
         btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
 
-        ttk.Button(
-            btn_frame, text="👁️ Просмотреть",
+        tk.Button(
+            btn_frame,
+            text="👁️ Просмотреть",
+            font=("Roboto", 10, "bold"),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
             command=lambda: self.view_campaign_details("completed")
         ).pack(side=tk.LEFT, padx=(0, 10))
 
-        ttk.Button(
-            btn_frame, text="📄 Экспорт запросов",
+        tk.Button(
+            btn_frame,
+            text="📄 Экспорт запросов",
+            font=("Roboto", 10, "bold"),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
             command=lambda: self.export_campaign_requests("completed")
         ).pack(side=tk.LEFT)
 
