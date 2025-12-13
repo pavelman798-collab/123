@@ -112,17 +112,20 @@ class MTSTheme:
 # ============== ТИПЫ ОПОВЕЩЕНИЙ ==============
 ALERT_TYPES = {
     "call": {
-        "name": "📞 Позвонить",
+        "name": "☎ Позвонить",
+        "icon": "☎",
         "service": "MONITOR_BANK",
         "monitor_bank_id": "1"
     },
     "call_sms": {
-        "name": "📞📱 Позвонить и отправить СМС",
+        "name": "⚡ Позвонить и отправить СМС",
+        "icon": "⚡",
         "service": "MONITOR_BANK",
         "monitor_bank_id": "1"
     },
     "sms": {
-        "name": "📱 Отправить СМС",
+        "name": "✉ Отправить СМС",
+        "icon": "✉",
         "service": "MONITOR_BANK",
         "monitor_bank_id": "1"
     },
@@ -965,17 +968,24 @@ class IVRCallerApp:
 
     def __init__(self, root, username=None):
         self.root = root
-        self.root.title("📞 Outbound Manager")
-        self.root.geometry("750x650")
+        self.root.title("МТС Outbound Manager")
+        self.root.geometry("850x700")
         self.root.resizable(True, True)
-        self.root.minsize(650, 550)
+        self.root.minsize(750, 600)
+
+        # Загрузка темы
+        self.current_theme = MTSTheme.load_theme()
+        self.colors = MTSTheme.get_colors(self.current_theme)
+
+        # Применение цветов к окну
+        self.root.configure(bg=self.colors['bg'])
 
         # Конфигурация
         self.config = Config(CONFIG_FILE)
 
         # Debug logger
         self.debug_logger = DebugLogger()
-        self.debug_logger.info("Приложение запущено", {"version": "v5", "user": username})
+        self.debug_logger.info("Приложение запущено", {"version": "v5", "user": username, "theme": self.current_theme})
 
         # Загрузчик данных
         self.data_loader = DataLoader(self.config)
@@ -1029,63 +1039,107 @@ class IVRCallerApp:
         self.root.geometry(f"+{x}+{y}")
 
     def setup_ui(self):
+        # Header МТС с логотипом и переключателем темы
+        header_frame = tk.Frame(self.root, bg=self.colors['header_bg'], height=60)
+        header_frame.pack(fill=tk.X)
+        header_frame.pack_propagate(False)
+
         # Логотип МТС
-        logo_frame = tk.Frame(self.root, bg="#E30611", height=50)
-        logo_frame.pack(fill=tk.X)
-        logo_frame.pack_propagate(False)
+        logo_container = tk.Frame(header_frame, bg=self.colors['header_bg'])
+        logo_container.pack(side=tk.LEFT, padx=20, pady=10)
 
         tk.Label(
-            logo_frame,
+            logo_container,
             text="МТС",
-            font=("Arial", 28, "bold"),
-            bg="#E30611",
-            fg="white"
-        ).pack(side=tk.LEFT, padx=15, pady=5)
-
-        tk.Label(
-            logo_frame,
-            text="Outbound Manager v5",
-            font=("Segoe UI", 11),
-            bg="#E30611",
-            fg="white"
-        ).pack(side=tk.LEFT, padx=(0, 15), pady=5)
-
-        # Верхняя панель
-        info_frame = ttk.Frame(self.root)
-        info_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
-
-        source_icon = "✅" if self.data_source != "Тестовые данные" else "⚠️"
-        ttk.Label(
-            info_frame,
-            text=f"{source_icon} Источник: {self.data_source} | Сотрудников: {len(self.employees)}",
-            font=("Segoe UI", 9),
-            foreground="gray"
+            font=("Arial", 32, "bold"),
+            bg=self.colors['header_bg'],
+            fg=self.colors['header_fg']
         ).pack(side=tk.LEFT)
 
-        ttk.Button(
-            info_frame, text="🔄 Обновить",
-            command=self.refresh_employees, width=12
-        ).pack(side=tk.RIGHT)
+        tk.Label(
+            logo_container,
+            text="Outbound Manager",
+            font=("Roboto", 13),
+            bg=self.colors['header_bg'],
+            fg=self.colors['header_fg']
+        ).pack(side=tk.LEFT, padx=(10, 0))
+
+        # Переключатель темы
+        theme_frame = tk.Frame(header_frame, bg=self.colors['header_bg'])
+        theme_frame.pack(side=tk.RIGHT, padx=20)
+
+        theme_btn = tk.Button(
+            theme_frame,
+            text="◐ Сменить тему",
+            font=("Roboto", 10),
+            bg=self.colors['header_bg'],
+            fg=self.colors['header_fg'],
+            activebackground=self.colors['primary_hover'],
+            activeforeground=self.colors['header_fg'],
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
+            command=self.toggle_theme
+        )
+        theme_btn.pack()
+
+        # Информационная панель
+        info_frame = tk.Frame(self.root, bg=self.colors['bg'])
+        info_frame.pack(fill=tk.X, padx=20, pady=(15, 10))
+
+        source_icon = "✓" if self.data_source != "Тестовые данные" else "⚠"
+        info_label = tk.Label(
+            info_frame,
+            text=f"{source_icon} Источник: {self.data_source}  •  Сотрудников: {len(self.employees)}",
+            font=("Roboto", 10),
+            bg=self.colors['bg'],
+            fg=self.colors['text_muted']
+        )
+        info_label.pack(side=tk.LEFT)
+
+        refresh_btn = tk.Button(
+            info_frame,
+            text="↻ Обновить",
+            font=("Roboto", 10),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=6,
+            command=self.refresh_employees
+        )
+        refresh_btn.pack(side=tk.RIGHT)
 
         # Вкладки
         self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(10, 15))
 
         self.constructor_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.constructor_frame, text="📝 Конструктор")
+        self.notebook.add(self.constructor_frame, text="⚙ Конструктор")
         self.setup_constructor_tab()
 
         self.history_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.history_frame, text="📜 История")
+        self.notebook.add(self.history_frame, text="⏱ История")
         self.setup_history_tab()
 
         # Статус-бар
-        self.status_label = ttk.Label(
-            self.root,
-            text=f"CONNID: {self.current_connid} | Готов к работе",
-            font=("Segoe UI", 9), foreground="gray"
+        status_frame = tk.Frame(self.root, bg=self.colors['secondary'], height=35)
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        status_frame.pack_propagate(False)
+
+        self.status_label = tk.Label(
+            status_frame,
+            text=f"CONNID: {self.current_connid}  •  Готов к работе",
+            font=("Roboto", 9),
+            bg=self.colors['secondary'],
+            fg=self.colors['text_muted'],
+            anchor=tk.W
         )
-        self.status_label.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 10))
+        self.status_label.pack(side=tk.LEFT, padx=20, pady=8)
 
     def setup_constructor_tab(self):
         # Инициализация списка номеров
@@ -2576,6 +2630,18 @@ class IVRCallerApp:
             print(f"Ошибка: {phone} - {e}")
             # Возвращаем данные запроса даже при ошибке
             return (False, data if 'data' in locals() else {})
+
+    def toggle_theme(self):
+        """Переключение между светлой и темной темой"""
+        new_theme = 'dark' if self.current_theme == 'light' else 'light'
+        MTSTheme.save_theme(new_theme)
+
+        # Показываем сообщение о перезапуске
+        messagebox.showinfo(
+            "Смена темы",
+            f"Тема изменена на {'темную' if new_theme == 'dark' else 'светлую'}!\n\n"
+            f"Перезапустите приложение для применения изменений."
+        )
 
     def on_closing(self):
         self.data_loader.disconnect()
