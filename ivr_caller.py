@@ -34,6 +34,78 @@ CONNID_FILE = os.path.join(BASE_DIR, "connid.txt")
 LOG_FILE = os.path.join(BASE_DIR, "ivr_log.txt")
 DEBUG_LOG_FILE = os.path.join(BASE_DIR, "debug.log")
 HISTORY_FILE = os.path.join(BASE_DIR, "campaigns_history.json")
+THEME_FILE = os.path.join(BASE_DIR, "theme.txt")
+# ===========================================
+
+
+# ============== ДИЗАЙН-СИСТЕМА МТС ==============
+class MTSTheme:
+    """Управление темами оформления в стиле МТС"""
+
+    # Светлая тема (по умолчанию)
+    LIGHT = {
+        'bg': '#FFFFFF',
+        'fg': '#333333',
+        'primary': '#E30611',  # Красный МТС
+        'primary_hover': '#C5050C',
+        'secondary': '#F5F5F5',
+        'border': '#E0E0E0',
+        'card_bg': '#FFFFFF',
+        'card_shadow': '#00000015',
+        'success': '#28A745',
+        'warning': '#FFC107',
+        'error': '#DC3545',
+        'text_muted': '#6C757D',
+        'input_bg': '#FFFFFF',
+        'header_bg': '#E30611',
+        'header_fg': '#FFFFFF'
+    }
+
+    # Темная тема
+    DARK = {
+        'bg': '#1E1E1E',
+        'fg': '#E0E0E0',
+        'primary': '#FF0019',  # Яркий красный для темной темы
+        'primary_hover': '#FF3340',
+        'secondary': '#2D2D2D',
+        'border': '#404040',
+        'card_bg': '#252525',
+        'card_shadow': '#00000040',
+        'success': '#2ECC71',
+        'warning': '#F39C12',
+        'error': '#E74C3C',
+        'text_muted': '#95A5A6',
+        'input_bg': '#2D2D2D',
+        'header_bg': '#252525',
+        'header_fg': '#FFFFFF'
+    }
+
+    @staticmethod
+    def load_theme():
+        """Загрузить текущую тему из файла"""
+        try:
+            if os.path.exists(THEME_FILE):
+                with open(THEME_FILE, 'r') as f:
+                    theme = f.read().strip()
+                    return theme if theme in ['light', 'dark'] else 'light'
+        except:
+            pass
+        return 'light'
+
+    @staticmethod
+    def save_theme(theme):
+        """Сохранить текущую тему в файл"""
+        try:
+            with open(THEME_FILE, 'w') as f:
+                f.write(theme)
+        except:
+            pass
+
+    @staticmethod
+    def get_colors(theme='light'):
+        """Получить цвета для указанной темы"""
+        return MTSTheme.DARK if theme == 'dark' else MTSTheme.LIGHT
+
 # ===========================================
 
 
