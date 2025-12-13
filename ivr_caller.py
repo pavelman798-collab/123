@@ -32,6 +32,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.ini")
 CONNID_FILE = os.path.join(BASE_DIR, "connid.txt")
 LOG_FILE = os.path.join(BASE_DIR, "ivr_log.txt")
+DEBUG_LOG_FILE = os.path.join(BASE_DIR, "debug.log")
 HISTORY_FILE = os.path.join(BASE_DIR, "campaigns_history.json")
 # ===========================================
 
@@ -71,6 +72,43 @@ FALLBACK_EMPLOYEES = {
     540: {"name": "Волков Сергей Николаевич", "phone": "+79999999999"},
 }
 # =============================================
+
+
+class DebugLogger:
+    """Детальное логирование для отладки"""
+
+    def __init__(self, log_file=DEBUG_LOG_FILE):
+        self.log_file = log_file
+
+    def _write_log(self, level, message, data=None):
+        """Запись в лог файл"""
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            log_entry = f"[{timestamp}] [{level}] {message}"
+
+            if data:
+                log_entry += f"\nДанные: {json.dumps(data, ensure_ascii=False, indent=2)}"
+
+            with open(self.log_file, 'a', encoding='utf-8') as f:
+                f.write(log_entry + "\n" + "-" * 80 + "\n")
+        except Exception as e:
+            print(f"Ошибка записи в debug.log: {e}")
+
+    def debug(self, message, data=None):
+        """DEBUG уровень - детальная отладочная информация"""
+        self._write_log("DEBUG", message, data)
+
+    def info(self, message, data=None):
+        """INFO уровень - общая информация"""
+        self._write_log("INFO", message, data)
+
+    def warning(self, message, data=None):
+        """WARNING уровень - предупреждения"""
+        self._write_log("WARNING", message, data)
+
+    def error(self, message, data=None):
+        """ERROR уровень - ошибки"""
+        self._write_log("ERROR", message, data)
 
 
 class Config:
@@ -863,6 +901,10 @@ class IVRCallerApp:
         # Конфигурация
         self.config = Config(CONFIG_FILE)
 
+        # Debug logger
+        self.debug_logger = DebugLogger()
+        self.debug_logger.info("Приложение запущено", {"version": "v5", "user": username})
+
         # Загрузчик данных
         self.data_loader = DataLoader(self.config)
 
@@ -915,6 +957,27 @@ class IVRCallerApp:
         self.root.geometry(f"+{x}+{y}")
 
     def setup_ui(self):
+        # Логотип МТС
+        logo_frame = tk.Frame(self.root, bg="#E30611", height=50)
+        logo_frame.pack(fill=tk.X)
+        logo_frame.pack_propagate(False)
+
+        tk.Label(
+            logo_frame,
+            text="МТС",
+            font=("Arial", 28, "bold"),
+            bg="#E30611",
+            fg="white"
+        ).pack(side=tk.LEFT, padx=15, pady=5)
+
+        tk.Label(
+            logo_frame,
+            text="Outbound Manager v5",
+            font=("Segoe UI", 11),
+            bg="#E30611",
+            fg="white"
+        ).pack(side=tk.LEFT, padx=(0, 15), pady=5)
+
         # Верхняя панель
         info_frame = ttk.Frame(self.root)
         info_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
@@ -1321,6 +1384,11 @@ class IVRCallerApp:
         btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
 
         ttk.Button(
+            btn_frame, text="👁️ Просмотреть",
+            command=lambda: self.view_campaign_details("queued")
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Button(
             btn_frame, text="📄 Экспорт запросов",
             command=lambda: self.export_campaign_requests("queued")
         ).pack(side=tk.LEFT, padx=(0, 10))
@@ -1381,9 +1449,14 @@ class IVRCallerApp:
 
         self.completed_tree.pack(fill=tk.BOTH, expand=True)
 
-        # Кнопка экспорта
+        # Кнопки действий
         btn_frame = ttk.Frame(self.completed_frame)
         btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        ttk.Button(
+            btn_frame, text="👁️ Просмотреть",
+            command=lambda: self.view_campaign_details("completed")
+        ).pack(side=tk.LEFT, padx=(0, 10))
 
         ttk.Button(
             btn_frame, text="📄 Экспорт запросов",
@@ -1552,6 +1625,129 @@ class IVRCallerApp:
             messagebox.showinfo("Успех", f"Экспорт завершен!\n\nФайл сохранен:\n{filename}")
         except Exception as e:
             messagebox.showerror("Ошибка", f"Ошибка при экспорте:\n{e}")
+
+    def view_campaign_details(self, tab_type):
+        """Просмотр детальной информации по кампании в отдельном окне"""
+        # Определяем какое дерево использовать
+        tree = self.queued_tree if tab_type == "queued" else self.completed_tree
+
+        selection = tree.selection()
+        if not selection:
+            messagebox.showwarning("Внимание", "Выберите кампанию для просмотра")
+            return
+
+        # Получаем ID кампании
+        item = selection[0]
+        campaign_id = tree.item(item)['tags'][0]
+
+        # Находим кампанию в истории
+        history = self.load_history()
+        campaign = None
+        for c in history:
+            if c.get('id') == campaign_id:
+                campaign = c
+                break
+
+        if not campaign:
+            messagebox.showerror("Ошибка", "Кампания не найдена")
+            return
+
+        # Создаем окно для просмотра
+        detail_window = tk.Toplevel(self.root)
+        detail_window.title(f"Детальная информация по кампании")
+        detail_window.geometry("900x700")
+        detail_window.transient(self.root)
+
+        # Рамка для текста
+        text_frame = ttk.Frame(detail_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Скроллбар
+        scrollbar = ttk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Текстовое поле с моноширинным шрифтом
+        text_widget = tk.Text(
+            text_frame,
+            wrap=tk.WORD,
+            font=("Consolas", 10),
+            yscrollcommand=scrollbar.set,
+            padx=10,
+            pady=10
+        )
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=text_widget.yview)
+
+        # Формируем содержимое (такое же как при экспорте)
+        content = ""
+        content += "=" * 80 + "\n"
+        content += "ЭКСПОРТ КАМПАНИИ\n"
+        content += "=" * 80 + "\n\n"
+        content += f"Тип: {campaign.get('alert_type', 'Не указан')}\n"
+        content += f"Дата создания: {campaign.get('date', 'Не указана')}\n"
+        content += f"Статус: {campaign.get('status', 'unknown')}\n"
+        content += f"Всего номеров: {campaign.get('total', 0)}\n"
+
+        if campaign.get('status') == 'completed':
+            content += f"Успешно: {campaign.get('success', 0)}\n"
+            content += f"Ошибок: {campaign.get('fail', 0)}\n"
+        elif campaign.get('status') == 'queued':
+            content += f"Запланировано на: {campaign.get('scheduled_time', 'Не указано')}\n"
+
+        content += f"\nОтправитель: {campaign.get('sender_phone', 'Не указан')}\n"
+        content += f"Шаблон СМС: {campaign.get('sms_template', 'Не указан')}\n"
+
+        content += "\n" + "=" * 80 + "\n"
+        content += "ТЕКСТЫ СООБЩЕНИЙ\n"
+        content += "=" * 80 + "\n\n"
+
+        voice_text = campaign.get('voice_text', '')
+        if voice_text:
+            content += f"📞 Текст для озвучивания:\n{voice_text}\n\n"
+
+        sms_text = campaign.get('sms_text', '')
+        if sms_text:
+            content += f"📱 Текст СМС:\n{sms_text}\n\n"
+
+        content += "=" * 80 + "\n"
+        content += "СПИСОК НОМЕРОВ И ЗАПРОСОВ\n"
+        content += "=" * 80 + "\n\n"
+
+        phones_data = campaign.get('phones_data', [])
+        for i, phone_info in enumerate(phones_data, 1):
+            content += f"\n{'-' * 80}\n"
+            content += f"ЗАПРОС #{i}\n"
+            content += f"{'-' * 80}\n\n"
+
+            content += f"Номер: {phone_info.get('number', 'Не указан')}\n"
+            content += f"Часовой пояс: UTC{phone_info.get('timezone', '+0')}\n\n"
+
+            # Выводим полный JSON запроса
+            request_info = phone_info.get('request_info', {})
+            if request_info:
+                content += f"URL: {request_info.get('url', 'Не указан')}\n"
+                content += f"Статус: {request_info.get('status', 'Не указан')}\n\n"
+
+                # Полный JSON запроса в читаемом формате
+                request_json = request_info.get('request_json', {})
+                if request_json:
+                    content += "JSON ЗАПРОСА:\n"
+                    content += json.dumps(request_json, ensure_ascii=False, indent=4)
+                    content += "\n"
+
+            content += "\n"
+
+        # Вставляем содержимое
+        text_widget.insert("1.0", content)
+        text_widget.config(state='disabled')  # Делаем только для чтения
+
+        # Кнопка закрытия
+        close_btn = ttk.Button(
+            detail_window,
+            text="Закрыть",
+            command=detail_window.destroy
+        )
+        close_btn.pack(pady=(0, 10))
 
     def refresh_queued_history(self):
         """Обновление отображения кампаний в очереди"""
@@ -1946,6 +2142,14 @@ class IVRCallerApp:
                 self.send_alerts(employees_to_call, alert_type, "Конструктор", campaign_extra)
 
     def send_alerts(self, employees, alert_type, source, campaign_extra=None, show_ui=True):
+        # DEBUG: Логируем запуск кампании
+        self.debug_logger.info(f"🚀 Запуск кампании", {
+            "source": source,
+            "alert_type": alert_type.get("name"),
+            "total_employees": len(employees),
+            "show_ui": show_ui
+        })
+
         success, fail = 0, 0
         requests_log = []
 
@@ -1953,25 +2157,32 @@ class IVRCallerApp:
         if show_ui:
             progress = tk.Toplevel(self.root)
             progress.title("Отправка...")
-            progress.geometry("350x120")
+            progress.geometry("400x160")
             progress.transient(self.root)
             progress.grab_set()
 
             label = ttk.Label(progress, text="Отправка...", font=("Segoe UI", 10))
-            label.pack(pady=20)
+            label.pack(pady=(20, 5))
+
+            # Процентный индикатор
+            percent_label = ttk.Label(progress, text="0%", font=("Segoe UI", 12, "bold"), foreground="#0066CC")
+            percent_label.pack(pady=(0, 10))
         else:
             progress = None
             label = None
+            percent_label = None
 
         if show_ui:
-            bar = ttk.Progressbar(progress, length=300, maximum=len(employees))
+            bar = ttk.Progressbar(progress, length=350, maximum=len(employees), mode='determinate')
             bar.pack(pady=10)
         else:
             bar = None
 
         for i, emp in enumerate(employees):
             if show_ui:
+                current_percent = int(((i + 1) / len(employees)) * 100)
                 label.config(text=f"Отправка: {emp['name']}...")
+                percent_label.config(text=f"{current_percent}%")
                 bar["value"] = i + 1
                 progress.update()
 
@@ -2189,6 +2400,16 @@ class IVRCallerApp:
                 }
                 service = "IVR_Quality_Control"
 
+            elif alert_type_key == "sms":
+                # Только СМС
+                add_prop = {
+                    "text_voice": voice_text,
+                    "CPN": sender_phone,
+                    "sms_text": sms_text,
+                    "template": sms_template
+                }
+                service = "IVR_Quality_Control_SMS"
+
             # Формируем данные запроса
             data = {
                 "ANI": phone,
@@ -2201,6 +2422,15 @@ class IVRCallerApp:
             }
 
             json_data = json.dumps(data, ensure_ascii=False).encode("utf-8")
+
+            # DEBUG: Логируем запрос перед отправкой
+            self.debug_logger.debug(f"Отправка запроса на номер {phone}", {
+                "phone": phone,
+                "alert_type": alert_type_key,
+                "service": service,
+                "url": self.config.api_url,
+                "request_data": data
+            })
 
             request = urllib.request.Request(
                 self.config.api_url,
@@ -2217,11 +2447,24 @@ class IVRCallerApp:
             with urllib.request.urlopen(request, context=ssl_context, timeout=self.config.api_timeout):
                 pass
 
+            # DEBUG: Успешная отправка
+            self.debug_logger.info(f"✅ Успешная отправка на {phone}", {"connid": connid})
+
             self.current_connid += 1
             self._save_connid()
             return (True, data)
 
         except Exception as e:
+            # DEBUG: Ошибка отправки
+            error_data = {
+                "phone": phone,
+                "error": str(e),
+                "error_type": type(e).__name__
+            }
+            if 'data' in locals():
+                error_data["request_data"] = data
+
+            self.debug_logger.error(f"❌ Ошибка отправки на {phone}", error_data)
             print(f"Ошибка: {phone} - {e}")
             # Возвращаем данные запроса даже при ошибке
             return (False, data if 'data' in locals() else {})
