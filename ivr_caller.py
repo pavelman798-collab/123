@@ -210,60 +210,30 @@ class Config:
             self._create_default()
 
     def _create_default(self):
-        self.config['database'] = {
-            'host': 'localhost', 'port': '5432',
-            'database': 'monitoring', 'user': 'user', 'password': 'password'
-        }
-        self.config['php_source'] = {
-            'base_url': 'https://help-monitoring.mbrd.ru',
-            'login_url': '/admin/index.php',
-            'employees_url': '/admin/people.php',
-            'username': 'admin', 'password': 'password'
-        }
         self.config['api'] = {'url': 'http://172.16.152.67:80/fm2/UDB/IVR_ADD_CALL_EXP'}
         self.config['settings'] = {
-            'data_source': 'auto', 'db_timeout': '10',
-            'api_timeout': '3', 'php_timeout': '30', 'verify_ssl': 'false'
+            'api_timeout': '3',
+            'verify_ssl': 'false'
+        }
+        self.config['log_server'] = {
+            'host': '',  # Адрес сервера (укажите сами)
+            'port': '22',
+            'username': '',  # Имя пользователя (укажите сами)
+            'password': '',  # Пароль (укажите сами)
+            'log_dir': '/opt/log/fm2/',
+            'log_file': 'fm2.log'
         }
         with open(self.config_path, 'w', encoding='utf-8') as f:
             self.config.write(f)
         print(f"✅ Создан конфиг: {self.config_path}")
 
     @property
-    def db_params(self):
-        return {
-            'host': self.config.get('database', 'host'),
-            'port': self.config.getint('database', 'port'),
-            'database': self.config.get('database', 'database'),
-            'user': self.config.get('database', 'user'),
-            'password': self.config.get('database', 'password'),
-        }
-
-    @property
-    def php_params(self):
-        return {
-            'base_url': self.config.get('php_source', 'base_url'),
-            'login_url': self.config.get('php_source', 'login_url'),
-            'employees_url': self.config.get('php_source', 'employees_url'),
-            'username': self.config.get('php_source', 'username'),
-            'password': self.config.get('php_source', 'password'),
-        }
-
-    @property
     def api_url(self):
         return self.config.get('api', 'url')
 
     @property
-    def data_source(self):
-        return self.config.get('settings', 'data_source', fallback='auto')
-
-    @property
     def api_timeout(self):
         return self.config.getint('settings', 'api_timeout', fallback=3)
-
-    @property
-    def php_timeout(self):
-        return self.config.getint('settings', 'php_timeout', fallback=30)
 
     @property
     def verify_ssl(self):
@@ -595,6 +565,8 @@ class IVRCallerApp:
 
         # Подключение к лог-серверу
         self.log_server = LogServerConnector(self.config)
+        # Создаем секцию log_server в конфиге, если её нет
+        self.log_server.get_connection_params()
 
         # CONNID
         self.current_connid = self._load_connid()
