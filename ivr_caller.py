@@ -157,6 +157,38 @@ FALLBACK_EMPLOYEES = {
 # =============================================
 
 
+class ToolTip:
+    """Всплывающая подсказка для виджетов"""
+
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tip_window = None
+        self.widget.bind('<Enter>', self.show_tip)
+        self.widget.bind('<Leave>', self.hide_tip)
+
+    def show_tip(self, event=None):
+        if self.tip_window or not self.text:
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        self.tip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(
+            tw, text=self.text, justify=tk.LEFT,
+            background="#FFFFCC", relief=tk.SOLID, borderwidth=1,
+            font=("Roboto", 9), padx=10, pady=5
+        )
+        label.pack()
+
+    def hide_tip(self, event=None):
+        tw = self.tip_window
+        self.tip_window = None
+        if tw:
+            tw.destroy()
+
+
 class DebugLogger:
     """Детальное логирование для отладки"""
 
@@ -470,7 +502,7 @@ class LogServerConnector:
             return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
     def check_campaign_delivery(self, phone_numbers):
-        """Проверка доставки для списка номеров
+        """Проверка доставки для списка номеров (оптимизированная с батчингом)
 
         Args:
             phone_numbers: list of phone numbers
@@ -478,10 +510,14 @@ class LogServerConnector:
         Returns:
             dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
         """
+        BATCH_SIZE = 50  # Максимум номеров в одном запросе (безопасно для командной строки)
+
         if self.debug_logger:
-            self.debug_logger.info("Начало проверки доставки кампании", {
+            self.debug_logger.info("Начало проверки доставки кампании (с батчингом)", {
                 "total_phones": len(phone_numbers),
-                "phones_preview": phone_numbers[:5]  # Первые 5 номеров
+                "batch_size": BATCH_SIZE,
+                "batches_count": (len(phone_numbers) + BATCH_SIZE - 1) // BATCH_SIZE,
+                "phones_preview": phone_numbers[:5]
             })
 
         results = {
@@ -493,24 +529,81 @@ class LogServerConnector:
         }
 
         try:
-            for i, phone in enumerate(phone_numbers, 1):
+            if not self.connected:
+                if not self.connect():
+                    return {
+                        'success': False,
+                        'error': 'Не удалось подключиться к лог-серверу',
+                        'total': len(phone_numbers),
+                        'delivered': 0,
+                        'failed': len(phone_numbers),
+                        'details': {}
+                    }
+
+            params = self.get_connection_params()
+            log_path = os.path.join(params['log_dir'], params['log_file'])
+
+            # Очищаем все номера от спецсимволов
+            clean_phones = {}
+            for phone in phone_numbers:
+                clean_phone = phone.replace('+', '').replace('-', '').replace(' ', '')
+                clean_phones[clean_phone] = phone
+
+            # Разбиваем на батчи для безопасности
+            phone_list = list(clean_phones.keys())
+            found_phones = {}
+
+            for batch_idx in range(0, len(phone_list), BATCH_SIZE):
+                batch = phone_list[batch_idx:batch_idx + BATCH_SIZE]
+                batch_num = (batch_idx // BATCH_SIZE) + 1
+                total_batches = (len(phone_list) + BATCH_SIZE - 1) // BATCH_SIZE
+
+                # Формируем команду grep для батча
+                pattern = '|'.join(batch)
+                command = f"grep -E '{pattern}' {log_path}"
+
                 if self.debug_logger:
-                    self.debug_logger.info(f"Проверка номера {i}/{len(phone_numbers)}", {"phone": phone})
+                    self.debug_logger.info(f"Выполнение батча {batch_num}/{total_batches}", {
+                        "command_length": len(command),
+                        "phones_in_batch": len(batch),
+                        "log_path": log_path
+                    })
 
-                search_result = self.search_phone_in_logs(phone)
+                # Выполняем grep для батча
+                stdin, stdout, stderr = self.client.exec_command(command)
+                output = stdout.read().decode('utf-8')
+                error = stderr.read().decode('utf-8')
 
-                if search_result['success'] and search_result['count'] > 0:
+                if self.debug_logger:
+                    self.debug_logger.info(f"Результат батча {batch_num}/{total_batches}", {
+                        "output_length": len(output),
+                        "output_lines": len(output.strip().split('\n')) if output else 0,
+                        "error": error if error else "нет ошибок"
+                    })
+
+                # Парсим результаты батча
+                if output:
+                    lines = output.strip().split('\n')
+                    for line in lines:
+                        if not line.strip():
+                            continue
+                        # Проверяем какой номер содержится в этой строке
+                        for clean_phone in batch:
+                            if clean_phone in line:
+                                original_phone = clean_phones[clean_phone]
+                                if original_phone not in found_phones:
+                                    found_phones[original_phone] = []
+                                found_phones[original_phone].append(line)
+
+            # Формируем результаты для каждого номера
+            for phone in phone_numbers:
+                if phone in found_phones:
                     results['delivered'] += 1
                     results['details'][phone] = {
                         'delivered': True,
-                        'count': search_result['count'],
-                        'entries': search_result.get('entries', [])
+                        'count': len(found_phones[phone]),
+                        'entries': found_phones[phone][:3]  # Возвращаем только первые 3 записи
                     }
-                    if self.debug_logger:
-                        self.debug_logger.info(f"Номер найден в логах", {
-                            "phone": phone,
-                            "entries_count": search_result['count']
-                        })
                 else:
                     results['failed'] += 1
                     results['details'][phone] = {
@@ -518,19 +611,16 @@ class LogServerConnector:
                         'count': 0,
                         'entries': []
                     }
-                    if self.debug_logger:
-                        error = search_result.get('error', 'Не найдено в логах')
-                        self.debug_logger.info(f"Номер НЕ найден в логах", {
-                            "phone": phone,
-                            "reason": error
-                        })
 
+            total_batches = (len(phone_numbers) + BATCH_SIZE - 1) // BATCH_SIZE
             if self.debug_logger:
-                self.debug_logger.info("Проверка доставки завершена", {
+                self.debug_logger.info("Проверка доставки завершена (с батчингом)", {
                     "total": results['total'],
                     "delivered": results['delivered'],
                     "failed": results['failed'],
-                    "delivery_rate": f"{(results['delivered'] / results['total'] * 100):.1f}%" if results['total'] > 0 else "0%"
+                    "delivery_rate": f"{(results['delivered'] / results['total'] * 100):.1f}%" if results['total'] > 0 else "0%",
+                    "batches_used": total_batches,
+                    "speed": f"{total_batches} запросов вместо {len(phone_numbers)}"
                 })
 
             return results
@@ -541,7 +631,6 @@ class LogServerConnector:
                 self.debug_logger.error("Критическая ошибка при проверке доставки", {
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "processed_phones": len(results['details']),
                     "total_phones": len(phone_numbers)
                 })
             return {
@@ -1491,17 +1580,34 @@ class IVRCallerApp:
         self.completed_tree.heading("date", text="Дата и время")
         self.completed_tree.heading("type", text="Тип")
         self.completed_tree.heading("phones", text="Всего номеров")
-        self.completed_tree.heading("success", text="Успешно")
-        self.completed_tree.heading("fail", text="Ошибок")
+        self.completed_tree.heading("success", text="✅ Успешно ❓")
+        self.completed_tree.heading("fail", text="❌ Ошибок ❓")
 
         self.completed_tree.column("status", width=100, anchor=tk.CENTER)
         self.completed_tree.column("date", width=180, anchor=tk.CENTER)
         self.completed_tree.column("type", width=200, anchor=tk.W)
         self.completed_tree.column("phones", width=120, anchor=tk.CENTER)
-        self.completed_tree.column("success", width=100, anchor=tk.CENTER)
-        self.completed_tree.column("fail", width=100, anchor=tk.CENTER)
+        self.completed_tree.column("success", width=120, anchor=tk.CENTER)
+        self.completed_tree.column("fail", width=120, anchor=tk.CENTER)
 
         self.completed_tree.pack(fill=tk.BOTH, expand=True)
+
+        # Панель с пояснениями
+        help_frame = tk.Frame(tree_frame, bg='#F0F8FF', relief=tk.GROOVE, borderwidth=1)
+        help_frame.pack(fill=tk.X, pady=(5, 0))
+
+        help_text = "ℹ️  Успешно: количество запросов принятых API сервером (HTTP 200) • Ошибок: количество запросов с ошибками отправки"
+        help_label = tk.Label(
+            help_frame,
+            text=help_text,
+            bg='#F0F8FF',
+            fg='#333333',
+            font=("Roboto", 9),
+            anchor=tk.W,
+            padx=10,
+            pady=5
+        )
+        help_label.pack(fill=tk.X)
 
         # Двойной клик для просмотра детальной информации
         self.completed_tree.bind("<Double-Button-1>", lambda e: self.view_campaign_details("completed"))
@@ -2835,7 +2941,12 @@ class IVRCallerApp:
         return queued_count, completed_count, total_sent
 
     def on_closing(self):
-        self.data_loader.disconnect()
+        """Обработчик закрытия приложения"""
+        # Отключаемся от лог-сервера если подключены
+        if self.log_server and self.log_server.connected:
+            self.log_server.disconnect()
+
+        # Закрываем окно
         self.root.destroy()
 
 
