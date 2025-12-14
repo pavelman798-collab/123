@@ -210,60 +210,30 @@ class Config:
             self._create_default()
 
     def _create_default(self):
-        self.config['database'] = {
-            'host': 'localhost', 'port': '5432',
-            'database': 'monitoring', 'user': 'user', 'password': 'password'
-        }
-        self.config['php_source'] = {
-            'base_url': 'https://help-monitoring.mbrd.ru',
-            'login_url': '/admin/index.php',
-            'employees_url': '/admin/people.php',
-            'username': 'admin', 'password': 'password'
-        }
         self.config['api'] = {'url': 'http://172.16.152.67:80/fm2/UDB/IVR_ADD_CALL_EXP'}
         self.config['settings'] = {
-            'data_source': 'auto', 'db_timeout': '10',
-            'api_timeout': '3', 'php_timeout': '30', 'verify_ssl': 'false'
+            'api_timeout': '3',
+            'verify_ssl': 'false'
+        }
+        self.config['log_server'] = {
+            'host': '',  # Адрес сервера (укажите сами)
+            'port': '22',
+            'username': '',  # Имя пользователя (укажите сами)
+            'password': '',  # Пароль (укажите сами)
+            'log_dir': '/opt/log/fm2/',
+            'log_file': 'fm2.log'
         }
         with open(self.config_path, 'w', encoding='utf-8') as f:
             self.config.write(f)
         print(f"✅ Создан конфиг: {self.config_path}")
 
     @property
-    def db_params(self):
-        return {
-            'host': self.config.get('database', 'host'),
-            'port': self.config.getint('database', 'port'),
-            'database': self.config.get('database', 'database'),
-            'user': self.config.get('database', 'user'),
-            'password': self.config.get('database', 'password'),
-        }
-
-    @property
-    def php_params(self):
-        return {
-            'base_url': self.config.get('php_source', 'base_url'),
-            'login_url': self.config.get('php_source', 'login_url'),
-            'employees_url': self.config.get('php_source', 'employees_url'),
-            'username': self.config.get('php_source', 'username'),
-            'password': self.config.get('php_source', 'password'),
-        }
-
-    @property
     def api_url(self):
         return self.config.get('api', 'url')
 
     @property
-    def data_source(self):
-        return self.config.get('settings', 'data_source', fallback='auto')
-
-    @property
     def api_timeout(self):
         return self.config.getint('settings', 'api_timeout', fallback=3)
-
-    @property
-    def php_timeout(self):
-        return self.config.getint('settings', 'php_timeout', fallback=30)
 
     @property
     def verify_ssl(self):
@@ -287,10 +257,11 @@ class Config:
 class LogServerConnector:
     """Подключение к лог-серверу по SSH и парсинг логов"""
 
-    def __init__(self, config):
+    def __init__(self, config, debug_logger=None):
         self.config = config
         self.client = None
         self.connected = False
+        self.debug_logger = debug_logger
 
     def get_connection_params(self):
         """Получить параметры подключения из конфига"""
@@ -319,17 +290,48 @@ class LogServerConnector:
 
     def connect(self):
         """Подключение к серверу по SSH"""
+        if self.debug_logger:
+            self.debug_logger.info("Попытка подключения к лог-серверу", {})
+
         if not HAS_PARAMIKO:
-            print("⚠️ paramiko не установлен. Установите: pip install paramiko")
+            error_msg = "paramiko не установлен. Установите: pip install paramiko"
+            print(f"⚠️ {error_msg}")
+            if self.debug_logger:
+                self.debug_logger.error("Ошибка подключения к лог-серверу", {"error": error_msg})
             return False
 
         params = self.get_connection_params()
 
+        # Логируем параметры подключения (без пароля)
+        if self.debug_logger:
+            self.debug_logger.info("Параметры подключения к лог-серверу", {
+                "host": params['host'],
+                "port": params['port'],
+                "username": params['username'],
+                "log_dir": params['log_dir'],
+                "log_file": params['log_file']
+            })
+
         if not params['host'] or not params['username'] or not params['password']:
-            print("⚠️ Не указаны параметры подключения к лог-серверу в config.ini")
+            error_msg = "Не указаны параметры подключения к лог-серверу в config.ini"
+            print(f"⚠️ {error_msg}")
+            if self.debug_logger:
+                self.debug_logger.error("Ошибка подключения к лог-серверу", {
+                    "error": error_msg,
+                    "host_empty": not params['host'],
+                    "username_empty": not params['username'],
+                    "password_empty": not params['password']
+                })
             return False
 
         try:
+            if self.debug_logger:
+                self.debug_logger.info("Инициализация SSH клиента", {
+                    "host": params['host'],
+                    "port": params['port'],
+                    "username": params['username']
+                })
+
             self.client = paramiko.SSHClient()
             self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.client.connect(
@@ -340,10 +342,27 @@ class LogServerConnector:
                 timeout=10
             )
             self.connected = True
-            print(f"✅ Подключено к лог-серверу: {params['host']}")
+            success_msg = f"Подключено к лог-серверу: {params['host']}"
+            print(f"✅ {success_msg}")
+
+            if self.debug_logger:
+                self.debug_logger.info("Успешное подключение к лог-серверу", {
+                    "host": params['host'],
+                    "port": params['port']
+                })
             return True
+
         except Exception as e:
-            print(f"❌ Ошибка подключения к лог-серверу: {e}")
+            error_msg = f"Ошибка подключения к лог-серверу: {str(e)}"
+            print(f"❌ {error_msg}")
+            if self.debug_logger:
+                self.debug_logger.error("Ошибка подключения к лог-серверу", {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "host": params['host'],
+                    "port": params['port'],
+                    "username": params['username']
+                })
             self.connected = False
             return False
 
@@ -363,9 +382,17 @@ class LogServerConnector:
         Returns:
             dict: {'success': bool, 'entries': list, 'count': int}
         """
+        if self.debug_logger:
+            self.debug_logger.info("Поиск номера в логах", {"phone": phone_number})
+
         if not self.connected:
+            if self.debug_logger:
+                self.debug_logger.info("Нет подключения, попытка подключиться", {})
             if not self.connect():
-                return {'success': False, 'entries': [], 'count': 0, 'error': 'Нет подключения'}
+                error_msg = 'Нет подключения'
+                if self.debug_logger:
+                    self.debug_logger.error("Не удалось подключиться для поиска", {"phone": phone_number})
+                return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
         params = self.get_connection_params()
         log_path = os.path.join(params['log_dir'], params['log_file'])
@@ -376,13 +403,37 @@ class LogServerConnector:
         # Формируем команду grep
         command = f"grep '{clean_phone}' {log_path}"
 
+        if self.debug_logger:
+            self.debug_logger.info("Выполнение SSH команды", {
+                "command": command,
+                "phone_original": phone_number,
+                "phone_clean": clean_phone,
+                "log_path": log_path
+            })
+
         try:
             stdin, stdout, stderr = self.client.exec_command(command)
             output = stdout.read().decode('utf-8')
             error = stderr.read().decode('utf-8')
 
+            if self.debug_logger:
+                self.debug_logger.info("Результат выполнения SSH команды", {
+                    "command": command,
+                    "phone": phone_number,
+                    "output_length": len(output),
+                    "output_lines": len(output.strip().split('\n')) if output else 0,
+                    "error": error if error else "нет ошибок",
+                    "output_preview": output[:500] if output else "пусто"  # Первые 500 символов
+                })
+
             if error and 'No such file' in error:
-                return {'success': False, 'entries': [], 'count': 0, 'error': 'Файл лога не найден'}
+                error_msg = 'Файл лога не найден'
+                if self.debug_logger:
+                    self.debug_logger.error("Файл лога не найден", {
+                        "log_path": log_path,
+                        "error": error
+                    })
+                return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
             # Парсим результаты
             entries = []
@@ -392,14 +443,31 @@ class LogServerConnector:
                     if line.strip():
                         entries.append(line)
 
-            return {
+            result = {
                 'success': True,
                 'entries': entries,
                 'count': len(entries)
             }
 
+            if self.debug_logger:
+                self.debug_logger.info("Результат поиска номера", {
+                    "phone": phone_number,
+                    "found_entries": len(entries),
+                    "entries_preview": entries[:3] if entries else []  # Первые 3 записи
+                })
+
+            return result
+
         except Exception as e:
-            return {'success': False, 'entries': [], 'count': 0, 'error': str(e)}
+            error_msg = str(e)
+            if self.debug_logger:
+                self.debug_logger.error("Ошибка при выполнении SSH команды", {
+                    "command": command,
+                    "phone": phone_number,
+                    "error": error_msg,
+                    "error_type": type(e).__name__
+                })
+            return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
     def check_campaign_delivery(self, phone_numbers):
         """Проверка доставки для списка номеров
@@ -408,586 +476,82 @@ class LogServerConnector:
             phone_numbers: list of phone numbers
 
         Returns:
-            dict: {'total': int, 'delivered': int, 'failed': int, 'details': dict}
+            dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
         """
+        if self.debug_logger:
+            self.debug_logger.info("Начало проверки доставки кампании", {
+                "total_phones": len(phone_numbers),
+                "phones_preview": phone_numbers[:5]  # Первые 5 номеров
+            })
+
         results = {
+            'success': True,
             'total': len(phone_numbers),
             'delivered': 0,
             'failed': 0,
             'details': {}
         }
 
-        for phone in phone_numbers:
-            search_result = self.search_phone_in_logs(phone)
-
-            if search_result['success'] and search_result['count'] > 0:
-                results['delivered'] += 1
-                results['details'][phone] = {
-                    'status': 'delivered',
-                    'log_entries': search_result['count']
-                }
-            else:
-                results['failed'] += 1
-                results['details'][phone] = {
-                    'status': 'not_found',
-                    'log_entries': 0
-                }
-
-        return results
-
-
-class DatabaseManager:
-    """Работа с PostgreSQL"""
-
-    def __init__(self, config):
-        self.config = config
-        self.connection = None
-
-    def connect(self):
-        if not HAS_PSYCOPG2:
-            return False
         try:
-            self.connection = psycopg2.connect(
-                host=self.config.db_params['host'],
-                port=self.config.db_params['port'],
-                database=self.config.db_params['database'],
-                user=self.config.db_params['user'],
-                password=self.config.db_params['password'],
-                connect_timeout=10
-            )
-            print("✅ PostgreSQL подключен")
-            return True
-        except Exception as e:
-            print(f"❌ PostgreSQL ошибка: {e}")
-            return False
+            for i, phone in enumerate(phone_numbers, 1):
+                if self.debug_logger:
+                    self.debug_logger.info(f"Проверка номера {i}/{len(phone_numbers)}", {"phone": phone})
 
-    def disconnect(self):
-        if self.connection:
-            self.connection.close()
-            self.connection = None
+                search_result = self.search_phone_in_logs(phone)
 
-    def load_employees(self):
-        if not self.connection:
-            return {}
-
-        employees = {}
-        try:
-            cursor = self.connection.cursor()
-
-            # ========== SQL ЗАПРОС — ПОПРАВЬТЕ ПОД ВАШУ СТРУКТУРУ ==========
-            query = """
-                SELECT
-                    id,
-                    surname,
-                    name,
-                    patronymic,
-                    phone
-                FROM employees
-                WHERE is_active = true
-                  AND phone IS NOT NULL
-                  AND phone != ''
-                ORDER BY surname, name
-            """
-            # ================================================================
-
-            cursor.execute(query)
-            for row in cursor.fetchall():
-                emp_id, surname, name, patronymic, phone = row
-                fio = ' '.join(filter(None, [surname, name, patronymic]))
-                phone = self._normalize_phone(phone)
-                if fio and phone:
-                    employees[emp_id] = {"name": fio, "phone": phone}
-
-            cursor.close()
-            print(f"✅ Из БД загружено: {len(employees)} сотрудников")
-        except Exception as e:
-            print(f"❌ Ошибка загрузки из БД: {e}")
-
-        return employees
-
-    def _normalize_phone(self, phone):
-        if not phone:
-            return ""
-        phone = re.sub(r'[^\d+]', '', phone)
-        if phone.startswith('8') and len(phone) == 11:
-            phone = '+7' + phone[1:]
-        elif phone.startswith('7') and len(phone) == 11:
-            phone = '+' + phone
-        return phone
-
-
-class PHPParser:
-    """Парсинг сотрудников с PHP-страницы"""
-
-    def __init__(self, config):
-        self.config = config
-        self.cookies = http.cookiejar.CookieJar()
-        self.opener = None
-        self.debug_log = []  # Лог для отладки
-        self._setup_opener()
-
-    def _log(self, message):
-        """Добавление в лог"""
-        print(message)
-        self.debug_log.append(message)
-
-    def _setup_opener(self):
-        """Настройка opener с поддержкой cookies и SSL"""
-        cookie_handler = urllib.request.HTTPCookieProcessor(self.cookies)
-
-        # SSL контекст
-        ssl_context = ssl.create_default_context()
-        if not self.config.verify_ssl:
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-
-        https_handler = urllib.request.HTTPSHandler(context=ssl_context)
-        self.opener = urllib.request.build_opener(cookie_handler, https_handler)
-
-    def _login(self):
-        """Авторизация на PHP-странице"""
-        params = self.config.php_params
-
-        self._log("=" * 50)
-        self._log("🔐 ЭТАП 1: Авторизация")
-        self._log("=" * 50)
-        self._log(f"   Base URL: {params['base_url']}")
-        self._log(f"   Login URL: {params['login_url']}")
-        self._log(f"   Полный URL: {params['base_url'] + params['login_url']}")
-        self._log(f"   Username: {params['username']}")
-        self._log(f"   Password: {'*' * len(params['password'])}")
-
-        login_url = params['base_url'] + params['login_url']
-
-        # Сначала GET запрос на страницу логина (ОБЯЗАТЕЛЬНО для получения PHPSESSID)
-        self._log("")
-        self._log("📡 Шаг 1.1: GET запрос на страницу логина (получение PHPSESSID)...")
-        phpsessid = None
-        try:
-            get_request = urllib.request.Request(
-                login_url,
-                method='GET',
-                headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'ru,en;q=0.9',
-                }
-            )
-            get_response = self.opener.open(get_request, timeout=self.config.php_timeout)
-            get_status = get_response.getcode()
-            get_url_final = get_response.geturl()
-            get_response.read()  # Читаем ответ чтобы закрыть соединение
-
-            self._log(f"   ✅ GET успешен")
-            self._log(f"   Статус: {get_status}")
-            self._log(f"   Итоговый URL: {get_url_final}")
-            self._log(f"   Cookies получены: {len(self.cookies)}")
-            for cookie in self.cookies:
-                self._log(f"      - {cookie.name}: {cookie.value}")
-                if cookie.name == 'PHPSESSID':
-                    phpsessid = cookie.value
-
-            if phpsessid:
-                self._log(f"   ✅ PHPSESSID получен: {phpsessid}")
-            else:
-                self._log(f"   ⚠️ PHPSESSID не найден в cookies!")
-
-        except urllib.error.HTTPError as e:
-            self._log(f"   ❌ GET ошибка HTTP: {e.code} {e.reason}")
-            self._log(f"   URL: {e.geturl()}")
-            return False
-        except Exception as e:
-            self._log(f"   ❌ GET ошибка: {type(e).__name__}: {e}")
-            return False
-
-        # Данные для логина
-        login_data = urllib.parse.urlencode({
-            'client_name': params['username'],
-            'client_pass': params['password']
-        }).encode('utf-8')
-
-        self._log("")
-        self._log("📡 Шаг 1.2: POST запрос для авторизации...")
-        self._log(f"   Данные: client_name={params['username']}&client_pass=***")
-
-        try:
-            request = urllib.request.Request(
-                login_url,
-                data=login_data,
-                method='POST',
-                headers={
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'ru,en;q=0.9',
-                    'Origin': params['base_url'],
-                    'Referer': login_url,
-                    'Cache-Control': 'max-age=0',
-                }
-            )
-
-            response = self.opener.open(request, timeout=self.config.php_timeout)
-            status = response.getcode()
-            final_url = response.geturl()
-            html = response.read().decode('utf-8', errors='ignore')
-
-            self._log(f"   ✅ POST успешен")
-            self._log(f"   Статус: {status}")
-            self._log(f"   Итоговый URL (после редиректа): {final_url}")
-            self._log(f"   Размер ответа: {len(html)} символов")
-            self._log(f"   Cookies после логина: {len(self.cookies)}")
-
-            # Показываем все cookies
-            for cookie in self.cookies:
-                self._log(f"      - {cookie.name}: {cookie.value}")
-
-            # Показываем начало HTML ответа для диагностики
-            self._log(f"   ")
-            self._log(f"   📄 HTML ответа (первые 800 символов):")
-            self._log(f"   {html[:800]}")
-            self._log(f"   ")
-
-            # Проверяем, успешен ли логин (ищем признаки)
-            if 'logout' in html.lower() or 'выход' in html.lower() or 'exit' in html.lower():
-                self._log("   ✅ Найден признак успешного логина (logout/выход)")
-            elif 'error' in html.lower() or 'ошибка' in html.lower() or 'неверн' in html.lower():
-                self._log("   ⚠️ Возможно ошибка авторизации (найдено слово error/ошибка)")
-                self._log(f"   Первые 500 символов ответа:")
-                self._log(f"   {html[:500]}")
-                return False
-            elif params['login_url'] in final_url:
-                self._log("   ⚠️ Остались на странице логина — возможно неверные креды")
-                return False
-            else:
-                self._log("   ✅ Предполагаем успешный логин (редирект произошёл)")
-
-            # Шаг 1.3: Заходим на main.php чтобы активировать сессию
-            self._log("")
-            self._log("📡 Шаг 1.3: GET запрос на main.php (активация сессии)...")
-            try:
-                main_url = params['base_url'] + '/admin/main.php'
-                main_request = urllib.request.Request(
-                    main_url,
-                    method='GET',
-                    headers={
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        'Referer': login_url
+                if search_result['success'] and search_result['count'] > 0:
+                    results['delivered'] += 1
+                    results['details'][phone] = {
+                        'delivered': True,
+                        'count': search_result['count'],
+                        'entries': search_result.get('entries', [])
                     }
-                )
-                main_response = self.opener.open(main_request, timeout=self.config.php_timeout)
-                main_status = main_response.getcode()
-                main_html = main_response.read().decode('utf-8', errors='ignore')
-                self._log(f"   ✅ main.php загружен, статус: {main_status}")
-                self._log(f"   Размер: {len(main_html)} символов")
-
-                # Проверяем что мы залогинены
-                if 'logout' in main_html.lower() or 'выход' in main_html.lower():
-                    self._log("   ✅ Сессия активна (найден logout)")
-                    return True
-                elif 'locked' in main_html.lower() or 'access' in main_html.lower():
-                    self._log("   ❌ Доступ закрыт")
-                    return False
+                    if self.debug_logger:
+                        self.debug_logger.info(f"Номер найден в логах", {
+                            "phone": phone,
+                            "entries_count": search_result['count']
+                        })
                 else:
-                    self._log("   ✅ Предполагаем что сессия активна")
-                    return True
+                    results['failed'] += 1
+                    results['details'][phone] = {
+                        'delivered': False,
+                        'count': 0,
+                        'entries': []
+                    }
+                    if self.debug_logger:
+                        error = search_result.get('error', 'Не найдено в логах')
+                        self.debug_logger.info(f"Номер НЕ найден в логах", {
+                            "phone": phone,
+                            "reason": error
+                        })
 
-            except Exception as e:
-                self._log(f"   ⚠️ Ошибка main.php: {e}")
-                # Продолжаем всё равно — может сработает
-                return True
+            if self.debug_logger:
+                self.debug_logger.info("Проверка доставки завершена", {
+                    "total": results['total'],
+                    "delivered": results['delivered'],
+                    "failed": results['failed'],
+                    "delivery_rate": f"{(results['delivered'] / results['total'] * 100):.1f}%" if results['total'] > 0 else "0%"
+                })
 
-        except urllib.error.HTTPError as e:
-            self._log(f"   ❌ HTTP ошибка: {e.code} {e.reason}")
-            self._log(f"   URL: {e.geturl()}")
-            if e.code == 404:
-                self._log("   💡 404 = страница не найдена. Проверьте login_url в config.ini")
-            elif e.code == 403:
-                self._log("   💡 403 = доступ запрещён. Возможно нужна VPN или IP в whitelist")
-            elif e.code == 401:
-                self._log("   💡 401 = требуется авторизация. Возможно Basic Auth?")
-            return False
-
-        except urllib.error.URLError as e:
-            self._log(f"   ❌ URL ошибка: {e.reason}")
-            self._log("   💡 Проверьте: доступен ли сайт? Правильный ли base_url?")
-            return False
-
-        except Exception as e:
-            self._log(f"   ❌ Неизвестная ошибка: {type(e).__name__}: {e}")
-            return False
-
-    def load_employees(self):
-        """Загрузка и парсинг списка сотрудников"""
-        if not self._login():
-            self._log("")
-            self._log("❌ Авторизация не удалась, загрузка сотрудников отменена")
-            return {}
-
-        params = self.config.php_params
-        employees_url = params['base_url'] + params['employees_url']
-
-        self._log("")
-        self._log("=" * 50)
-        self._log("📋 ЭТАП 2: Загрузка списка сотрудников")
-        self._log("=" * 50)
-        self._log(f"   Employees URL: {params['employees_url']}")
-        self._log(f"   Полный URL: {employees_url}")
-
-        try:
-            request = urllib.request.Request(
-                employees_url,
-                headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': params['base_url'] + params['login_url']
-                }
-            )
-
-            response = self.opener.open(request, timeout=self.config.php_timeout)
-            status = response.getcode()
-            final_url = response.geturl()
-            html = response.read().decode('utf-8', errors='ignore')
-
-            self._log(f"   ✅ GET успешен")
-            self._log(f"   Статус: {status}")
-            self._log(f"   Итоговый URL: {final_url}")
-            self._log(f"   Размер HTML: {len(html)} символов")
-
-            # Проверяем, не редиректнуло ли на логин
-            if 'login' in final_url.lower() or 'client_name' in html:
-                self._log("   ⚠️ Похоже нас редиректнуло на страницу логина!")
-                self._log("   💡 Сессия не сохранилась. Возможные причины:")
-                self._log("      - Неверные креды")
-                self._log("      - Сайт не принимает cookies")
-                self._log("      - Нужен другой механизм авторизации")
-                return {}
-
-            # Проверяем наличие таблицы
-            if '<table' in html.lower():
-                self._log(f"   ✅ Таблица найдена в HTML")
-            else:
-                self._log(f"   ⚠️ Таблица НЕ найдена в HTML!")
-                self._log(f"   Первые 1000 символов:")
-                self._log(f"   {html[:1000]}")
-
-            employees = self._parse_html(html)
-
-            self._log("")
-            self._log("=" * 50)
-            self._log(f"📊 ИТОГ: Загружено {len(employees)} сотрудников")
-            self._log("=" * 50)
-
-            if employees:
-                # Показываем первых 3 для проверки
-                self._log("   Примеры:")
-                for i, (emp_id, emp) in enumerate(list(employees.items())[:3]):
-                    self._log(f"      {emp_id}: {emp['name']} | {emp['phone']}")
-
-            return employees
-
-        except urllib.error.HTTPError as e:
-            self._log(f"   ❌ HTTP ошибка: {e.code} {e.reason}")
-            if e.code == 404:
-                self._log("   💡 404 = страница не найдена. Проверьте employees_url")
-            elif e.code == 403:
-                self._log("   💡 403 = доступ запрещён после логина")
-            return {}
+            return results
 
         except Exception as e:
-            self._log(f"   ❌ Ошибка: {type(e).__name__}: {e}")
-            return {}
-
-    def _parse_html(self, html):
-        """Парсинг HTML-таблицы"""
-        employees = {}
-
-        # Диагностика
-        self._log("")
-        self._log("🔍 ПАРСИНГ HTML:")
-        self._log(f"   Размер HTML: {len(html)} символов")
-
-        # Ищем строки таблицы
-        row_pattern = re.compile(r'<tr[^>]*>(.*?)</tr>', re.DOTALL | re.IGNORECASE)
-        cell_pattern = re.compile(r'<td[^>]*>(.*?)</td>', re.DOTALL | re.IGNORECASE)
-
-        all_rows = row_pattern.findall(html)
-        self._log(f"   Найдено строк <tr>: {len(all_rows)}")
-
-        rows_with_6_cells = 0
-        rows_with_id = 0
-        rows_with_phone = 0
-        skipped_no_phone = 0
-        skipped_bad_phone = 0
-
-        for row_html in all_rows:
-            cells = cell_pattern.findall(row_html)
-
-            if len(cells) >= 6:
-                rows_with_6_cells += 1
-                clean_cells = [self._strip_html(cell).strip() for cell in cells]
-
-                try:
-                    emp_id = int(clean_cells[0])
-                    rows_with_id += 1
-                except ValueError:
-                    continue
-
-                surname = clean_cells[2] if len(clean_cells) > 2 else ""
-                name = clean_cells[3] if len(clean_cells) > 3 else ""
-                patronymic = clean_cells[4] if len(clean_cells) > 4 else ""
-                phone_raw = clean_cells[5] if len(clean_cells) > 5 else ""
-
-                fio = ' '.join(filter(None, [surname, name, patronymic]))
-                phone = self._normalize_phone(phone_raw)
-
-                if not phone_raw:
-                    skipped_no_phone += 1
-                    continue
-
-                if not phone:
-                    skipped_bad_phone += 1
-                    # Показываем первые 5 примеров "плохих" телефонов
-                    if skipped_bad_phone <= 5:
-                        self._log(f"      ⚠️ Пропущен телефон: '{phone_raw}' (ID={emp_id}, {surname})")
-                    continue
-
-                if fio and phone:
-                    rows_with_phone += 1
-                    employees[emp_id] = {"name": fio, "phone": phone}
-                elif phone and not fio:
-                    skipped_no_fio = skipped_no_fio + 1 if 'skipped_no_fio' in dir() else 1
-                    if skipped_no_fio <= 5:
-                        self._log(f"      ⚠️ Есть телефон, но нет ФИО:")
-                        self._log(f"         ID={emp_id}")
-                        self._log(f"         Ячейка[2] (фамилия): '{clean_cells[2] if len(clean_cells) > 2 else 'НЕТ'}'")
-                        self._log(f"         Ячейка[3] (имя): '{clean_cells[3] if len(clean_cells) > 3 else 'НЕТ'}'")
-                        self._log(f"         Ячейка[4] (отчество): '{clean_cells[4] if len(clean_cells) > 4 else 'НЕТ'}'")
-                        self._log(f"         Ячейка[5] (телефон): '{clean_cells[5] if len(clean_cells) > 5 else 'НЕТ'}'")
-                        self._log(f"         phone_raw: '{phone_raw}'")
-                        self._log(f"         phone после нормализации: '{phone}'")
-
-        # Считаем пропущенных без ФИО
-        skipped_no_fio_count = rows_with_id - skipped_no_phone - skipped_bad_phone - rows_with_phone
-
-        self._log(f"   Строк с 6+ ячейками: {rows_with_6_cells}")
-        self._log(f"   Строк с числовым ID: {rows_with_id}")
-        self._log(f"   Пропущено (нет телефона): {skipped_no_phone}")
-        self._log(f"   Пропущено (плохой формат телефона): {skipped_bad_phone}")
-        self._log(f"   Пропущено (есть телефон, нет ФИО): {skipped_no_fio_count}")
-        self._log(f"   ✅ Сотрудников с телефоном: {rows_with_phone}")
-
-        return employees
-
-    def _strip_html(self, text):
-        """Удаление HTML-тегов"""
-        return re.sub(r'<[^>]+>', '', text)
-
-    def _normalize_phone(self, phone):
-        """Нормализация номера телефона"""
-        if not phone:
-            return ""
-
-        # Убираем всё кроме цифр и +
-        phone = re.sub(r'[^\d+]', '', phone)
-
-        # Пустой после очистки
-        if not phone:
-            return ""
-
-        # Если только цифры без +
-        digits_only = re.sub(r'\D', '', phone)
-
-        # Если 11 цифр и начинается с 8 → меняем на +7
-        if len(digits_only) == 11 and digits_only.startswith('8'):
-            return '+7' + digits_only[1:]
-
-        # Если 11 цифр и начинается с 7 → добавляем +
-        if len(digits_only) == 11 and digits_only.startswith('7'):
-            return '+' + digits_only
-
-        # Если 10 цифр (без кода страны) → добавляем +7
-        if len(digits_only) == 10:
-            return '+7' + digits_only
-
-        # Если уже начинается с + и достаточно цифр → оставляем
-        if phone.startswith('+') and len(digits_only) >= 10:
-            return phone
-
-        # Если 11+ цифр без + → добавляем +
-        if len(digits_only) >= 11:
-            return '+' + digits_only
-
-        # Всё остальное — возвращаем как есть, если есть хоть 6 цифр (короткие номера)
-        if len(digits_only) >= 6:
-            return '+' + digits_only if not phone.startswith('+') else phone
-
-        return ""
-
-
-class DataLoader:
-    """Загрузчик данных с fallback"""
-
-    def __init__(self, config):
-        self.config = config
-        self.db = DatabaseManager(config)
-        self.php = PHPParser(config)
-        self.source_used = "none"
-
-    def load_employees(self):
-        """Загрузка сотрудников с автоматическим fallback"""
-        data_source = self.config.data_source
-
-        if data_source == 'auto':
-            # Сначала БД, потом PHP, потом fallback
-            employees = self._try_database()
-            if employees:
-                return employees
-
-            employees = self._try_php()
-            if employees:
-                return employees
-
-            return self._use_fallback()
-
-        elif data_source == 'db':
-            employees = self._try_database()
-            return employees if employees else self._use_fallback()
-
-        elif data_source == 'php':
-            employees = self._try_php()
-            return employees if employees else self._use_fallback()
-
-        else:
-            return self._use_fallback()
-
-    def _try_database(self):
-        """Попытка загрузки из БД"""
-        print("🔄 Попытка загрузки из PostgreSQL...")
-        if self.db.connect():
-            employees = self.db.load_employees()
-            if employees:
-                self.source_used = "PostgreSQL"
-                return employees
-            self.db.disconnect()
-        return {}
-
-    def _try_php(self):
-        """Попытка загрузки из PHP"""
-        print("🔄 Попытка загрузки из PHP...")
-        employees = self.php.load_employees()
-        if employees:
-            self.source_used = "PHP"
-            return employees
-        return {}
-
-    def _use_fallback(self):
-        """Использование тестовых данных"""
-        print("⚠️ Используются тестовые данные")
-        self.source_used = "Тестовые данные"
-        return FALLBACK_EMPLOYEES.copy()
-
-    def disconnect(self):
-        """Отключение от источников"""
-        self.db.disconnect()
+            error_msg = f"Ошибка при проверке доставки: {str(e)}"
+            if self.debug_logger:
+                self.debug_logger.error("Критическая ошибка при проверке доставки", {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "processed_phones": len(results['details']),
+                    "total_phones": len(phone_numbers)
+                })
+            return {
+                'success': False,
+                'error': error_msg,
+                'total': len(phone_numbers),
+                'delivered': results['delivered'],
+                'failed': results['failed'],
+                'details': results['details']
+            }
 
 
 class LoginWindow:
@@ -1147,8 +711,10 @@ class IVRCallerApp:
         self.debug_logger = DebugLogger()
         self.debug_logger.info("Приложение запущено", {"version": "v5", "user": username, "theme": self.current_theme})
 
-        # Загрузчик данных
-        self.data_loader = DataLoader(self.config)
+        # Подключение к лог-серверу
+        self.log_server = LogServerConnector(self.config, self.debug_logger)
+        # Создаем секцию log_server в конфиге, если её нет
+        self.log_server.get_connection_params()
 
         # CONNID
         self.current_connid = self._load_connid()
@@ -2252,13 +1818,228 @@ class IVRCallerApp:
         text_widget.insert("1.0", content)
         text_widget.config(state='disabled')  # Делаем только для чтения
 
+        # Рамка для кнопок
+        btn_frame = ttk.Frame(detail_window)
+        btn_frame.pack(pady=(0, 10))
+
+        # Кнопка проверки доставки
+        check_delivery_btn = tk.Button(
+            btn_frame,
+            text="Проверить доставку",
+            font=("Roboto", 11, "bold"),
+            bg=self.colors['primary'],
+            fg='white',
+            activebackground='#B8050E',
+            activeforeground='white',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=20,
+            pady=10,
+            command=lambda: self.check_campaign_delivery_ui(campaign)
+        )
+        check_delivery_btn.pack(side=tk.LEFT, padx=5)
+
         # Кнопка закрытия
-        close_btn = ttk.Button(
-            detail_window,
+        close_btn = tk.Button(
+            btn_frame,
             text="Закрыть",
+            font=("Roboto", 11),
+            bg='#E0E0E0',
+            fg='#333333',
+            activebackground='#D0D0D0',
+            activeforeground='#333333',
+            relief=tk.SOLID,
+            borderwidth=1,
+            cursor="hand2",
+            padx=20,
+            pady=10,
             command=detail_window.destroy
         )
-        close_btn.pack(pady=(0, 10))
+        close_btn.pack(side=tk.LEFT, padx=5)
+
+    def check_campaign_delivery_ui(self, campaign):
+        """Проверка доставки кампании через лог-сервер"""
+        if not HAS_PARAMIKO:
+            messagebox.showerror(
+                "Ошибка",
+                "Библиотека paramiko не установлена.\n\n"
+                "Установите её командой:\n"
+                "pip install paramiko"
+            )
+            return
+
+        # Извлекаем номера телефонов
+        phones_data = campaign.get('phones_data', [])
+        if not phones_data:
+            messagebox.showwarning("Внимание", "В кампании нет номеров телефонов")
+            return
+
+        phone_numbers = [phone.get('number', '') for phone in phones_data if phone.get('number')]
+
+        if not phone_numbers:
+            messagebox.showwarning("Внимание", "Не удалось извлечь номера телефонов")
+            return
+
+        # Показываем окно ожидания
+        progress_window = tk.Toplevel(self.root)
+        progress_window.title("Проверка доставки")
+        progress_window.geometry("400x150")
+        progress_window.transient(self.root)
+        progress_window.grab_set()
+
+        tk.Label(
+            progress_window,
+            text="Подключение к лог-серверу...",
+            font=("Roboto", 12),
+            pady=20
+        ).pack()
+
+        tk.Label(
+            progress_window,
+            text=f"Проверка {len(phone_numbers)} номеров",
+            font=("Roboto", 10),
+            fg='gray'
+        ).pack()
+
+        progress_window.update()
+
+        try:
+            # Проверяем доставку
+            result = self.log_server.check_campaign_delivery(phone_numbers)
+
+            progress_window.destroy()
+
+            if not result['success']:
+                messagebox.showerror("Ошибка", f"Ошибка при проверке доставки:\n{result.get('error', 'Неизвестная ошибка')}")
+                return
+
+            # Показываем результаты
+            self.show_delivery_results(result, campaign)
+
+        except Exception as e:
+            progress_window.destroy()
+            messagebox.showerror("Ошибка", f"Ошибка при проверке доставки:\n{str(e)}")
+
+    def show_delivery_results(self, result, campaign):
+        """Отображение результатов проверки доставки"""
+        # Создаем окно результатов
+        results_window = tk.Toplevel(self.root)
+        results_window.title("Результаты проверки доставки")
+        results_window.geometry("800x600")
+        results_window.transient(self.root)
+
+        # Заголовок
+        header_frame = tk.Frame(results_window, bg=self.colors['primary'], height=60)
+        header_frame.pack(fill=tk.X)
+        header_frame.pack_propagate(False)
+
+        tk.Label(
+            header_frame,
+            text=f"Статистика доставки: {campaign.get('alert_type', 'кампания')}",
+            font=("Roboto", 14, "bold"),
+            bg=self.colors['primary'],
+            fg='white'
+        ).pack(pady=15)
+
+        # Рамка для статистики
+        stats_frame = tk.Frame(results_window, bg='white')
+        stats_frame.pack(fill=tk.X, padx=20, pady=20)
+
+        # Общая статистика
+        total = result.get('total', 0)
+        delivered = result.get('delivered', 0)
+        failed = result.get('failed', 0)
+        delivery_rate = (delivered / total * 100) if total > 0 else 0
+
+        stats_text = f"""
+┌─────────────────────────────────────────┐
+│          ОБЩАЯ СТАТИСТИКА              │
+├─────────────────────────────────────────┤
+│  Всего номеров:     {total:>4}              │
+│  Доставлено:        {delivered:>4}  ({delivery_rate:.1f}%)      │
+│  Не доставлено:     {failed:>4}              │
+└─────────────────────────────────────────┘
+        """
+
+        tk.Label(
+            stats_frame,
+            text=stats_text,
+            font=("Consolas", 11),
+            bg='white',
+            fg='#333333',
+            justify=tk.LEFT
+        ).pack(pady=10)
+
+        # Детальная информация
+        details_label = tk.Label(
+            results_window,
+            text="Детальная информация по номерам:",
+            font=("Roboto", 12, "bold"),
+            bg='white'
+        )
+        details_label.pack(anchor=tk.W, padx=20, pady=(10, 5))
+
+        # Рамка для деталей с прокруткой
+        details_frame = tk.Frame(results_window)
+        details_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
+
+        scrollbar = ttk.Scrollbar(details_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        details_text = tk.Text(
+            details_frame,
+            wrap=tk.WORD,
+            font=("Consolas", 10),
+            yscrollcommand=scrollbar.set,
+            padx=10,
+            pady=10
+        )
+        details_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=details_text.yview)
+
+        # Формируем детальную информацию
+        details_content = ""
+        details = result.get('details', {})
+
+        for i, (phone, info) in enumerate(details.items(), 1):
+            status = "✓ ДОСТАВЛЕНО" if info['delivered'] else "✗ НЕ ДОСТАВЛЕНО"
+            status_color = "green" if info['delivered'] else "red"
+
+            details_content += f"\n{'-' * 70}\n"
+            details_content += f"{i}. {phone} - {status}\n"
+            details_content += f"{'-' * 70}\n"
+
+            if info['count'] > 0:
+                details_content += f"Записей в логах: {info['count']}\n"
+                if info['entries']:
+                    details_content += "\nПримеры записей из лога:\n"
+                    for entry in info['entries'][:3]:  # Показываем до 3 записей
+                        details_content += f"  • {entry}\n"
+            else:
+                details_content += "Записи в логах не найдены\n"
+
+            details_content += "\n"
+
+        details_text.insert("1.0", details_content)
+        details_text.config(state='disabled')
+
+        # Кнопка закрытия
+        close_btn = tk.Button(
+            results_window,
+            text="Закрыть",
+            font=("Roboto", 11),
+            bg='#E0E0E0',
+            fg='#333333',
+            activebackground='#D0D0D0',
+            activeforeground='#333333',
+            relief=tk.SOLID,
+            borderwidth=1,
+            cursor="hand2",
+            padx=30,
+            pady=10,
+            command=results_window.destroy
+        )
+        close_btn.pack(pady=(0, 20))
 
     def refresh_queued_history(self):
         """Обновление отображения кампаний в очереди"""
@@ -2915,7 +2696,35 @@ class IVRCallerApp:
                 "ADD_PROP": json.dumps(add_prop, ensure_ascii=False)
             }
 
-            json_data = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            # Кодируем в JSON с сохранением UTF-8 символов
+            json_string = json.dumps(data, ensure_ascii=False)
+            json_data = json_string.encode("utf-8")
+
+            # Проверка и логирование кодировки UTF-8
+            try:
+                # Проверяем что можно декодировать обратно
+                decoded_test = json_data.decode("utf-8")
+                is_valid_utf8 = True
+
+                # Логируем детали кодировки
+                self.debug_logger.info("Проверка кодировки запроса UTF-8", {
+                    "phone": phone,
+                    "json_string_length": len(json_string),
+                    "json_bytes_length": len(json_data),
+                    "is_valid_utf8": is_valid_utf8,
+                    "encoding": "utf-8",
+                    "first_50_chars": json_string[:50],
+                    "first_50_bytes": str(json_data[:50]),
+                    "voice_text_sample": voice_text[:30] if voice_text else "",
+                    "sms_text_sample": sms_text[:30] if sms_text else "",
+                    "contains_cyrillic": any(ord(c) > 127 for c in json_string)
+                })
+            except UnicodeDecodeError as e:
+                self.debug_logger.error("Ошибка кодировки UTF-8!", {
+                    "phone": phone,
+                    "error": str(e),
+                    "json_bytes": str(json_data[:100])
+                })
 
             # DEBUG: Логируем запрос перед отправкой
             self.debug_logger.debug(f"Отправка запроса на номер {phone}", {
@@ -2923,7 +2732,8 @@ class IVRCallerApp:
                 "alert_type": alert_type_key,
                 "service": service,
                 "url": self.config.api_url,
-                "request_data": data
+                "request_data": data,
+                "request_size_bytes": len(json_data)
             })
 
             request = urllib.request.Request(
@@ -2938,11 +2748,33 @@ class IVRCallerApp:
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
 
-            with urllib.request.urlopen(request, context=ssl_context, timeout=self.config.api_timeout):
-                pass
+            with urllib.request.urlopen(request, context=ssl_context, timeout=self.config.api_timeout) as response:
+                # Читаем ответ сервера
+                response_code = response.getcode()
+                response_headers = dict(response.headers)
+                response_body = response.read()
+
+                # Пытаемся декодировать ответ
+                try:
+                    response_text = response_body.decode('utf-8')
+                except:
+                    response_text = str(response_body)
+
+                # Логируем ответ сервера
+                self.debug_logger.info("Ответ от API сервера", {
+                    "phone": phone,
+                    "connid": connid,
+                    "response_code": response_code,
+                    "response_headers": response_headers,
+                    "response_body": response_text[:500],  # Первые 500 символов
+                    "response_length": len(response_body)
+                })
 
             # DEBUG: Успешная отправка
-            self.debug_logger.info(f"✅ Успешная отправка на {phone}", {"connid": connid})
+            self.debug_logger.info(f"✅ Успешная отправка на {phone}", {
+                "connid": connid,
+                "http_code": response_code
+            })
 
             self.current_connid += 1
             self._save_connid()
