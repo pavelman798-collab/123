@@ -257,10 +257,11 @@ class Config:
 class LogServerConnector:
     """Подключение к лог-серверу по SSH и парсинг логов"""
 
-    def __init__(self, config):
+    def __init__(self, config, debug_logger=None):
         self.config = config
         self.client = None
         self.connected = False
+        self.debug_logger = debug_logger
 
     def get_connection_params(self):
         """Получить параметры подключения из конфига"""
@@ -289,17 +290,48 @@ class LogServerConnector:
 
     def connect(self):
         """Подключение к серверу по SSH"""
+        if self.debug_logger:
+            self.debug_logger.info("Попытка подключения к лог-серверу", {})
+
         if not HAS_PARAMIKO:
-            print("⚠️ paramiko не установлен. Установите: pip install paramiko")
+            error_msg = "paramiko не установлен. Установите: pip install paramiko"
+            print(f"⚠️ {error_msg}")
+            if self.debug_logger:
+                self.debug_logger.error("Ошибка подключения к лог-серверу", {"error": error_msg})
             return False
 
         params = self.get_connection_params()
 
+        # Логируем параметры подключения (без пароля)
+        if self.debug_logger:
+            self.debug_logger.info("Параметры подключения к лог-серверу", {
+                "host": params['host'],
+                "port": params['port'],
+                "username": params['username'],
+                "log_dir": params['log_dir'],
+                "log_file": params['log_file']
+            })
+
         if not params['host'] or not params['username'] or not params['password']:
-            print("⚠️ Не указаны параметры подключения к лог-серверу в config.ini")
+            error_msg = "Не указаны параметры подключения к лог-серверу в config.ini"
+            print(f"⚠️ {error_msg}")
+            if self.debug_logger:
+                self.debug_logger.error("Ошибка подключения к лог-серверу", {
+                    "error": error_msg,
+                    "host_empty": not params['host'],
+                    "username_empty": not params['username'],
+                    "password_empty": not params['password']
+                })
             return False
 
         try:
+            if self.debug_logger:
+                self.debug_logger.info("Инициализация SSH клиента", {
+                    "host": params['host'],
+                    "port": params['port'],
+                    "username": params['username']
+                })
+
             self.client = paramiko.SSHClient()
             self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.client.connect(
@@ -310,10 +342,27 @@ class LogServerConnector:
                 timeout=10
             )
             self.connected = True
-            print(f"✅ Подключено к лог-серверу: {params['host']}")
+            success_msg = f"Подключено к лог-серверу: {params['host']}"
+            print(f"✅ {success_msg}")
+
+            if self.debug_logger:
+                self.debug_logger.info("Успешное подключение к лог-серверу", {
+                    "host": params['host'],
+                    "port": params['port']
+                })
             return True
+
         except Exception as e:
-            print(f"❌ Ошибка подключения к лог-серверу: {e}")
+            error_msg = f"Ошибка подключения к лог-серверу: {str(e)}"
+            print(f"❌ {error_msg}")
+            if self.debug_logger:
+                self.debug_logger.error("Ошибка подключения к лог-серверу", {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "host": params['host'],
+                    "port": params['port'],
+                    "username": params['username']
+                })
             self.connected = False
             return False
 
@@ -333,9 +382,17 @@ class LogServerConnector:
         Returns:
             dict: {'success': bool, 'entries': list, 'count': int}
         """
+        if self.debug_logger:
+            self.debug_logger.info("Поиск номера в логах", {"phone": phone_number})
+
         if not self.connected:
+            if self.debug_logger:
+                self.debug_logger.info("Нет подключения, попытка подключиться", {})
             if not self.connect():
-                return {'success': False, 'entries': [], 'count': 0, 'error': 'Нет подключения'}
+                error_msg = 'Нет подключения'
+                if self.debug_logger:
+                    self.debug_logger.error("Не удалось подключиться для поиска", {"phone": phone_number})
+                return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
         params = self.get_connection_params()
         log_path = os.path.join(params['log_dir'], params['log_file'])
@@ -346,13 +403,37 @@ class LogServerConnector:
         # Формируем команду grep
         command = f"grep '{clean_phone}' {log_path}"
 
+        if self.debug_logger:
+            self.debug_logger.info("Выполнение SSH команды", {
+                "command": command,
+                "phone_original": phone_number,
+                "phone_clean": clean_phone,
+                "log_path": log_path
+            })
+
         try:
             stdin, stdout, stderr = self.client.exec_command(command)
             output = stdout.read().decode('utf-8')
             error = stderr.read().decode('utf-8')
 
+            if self.debug_logger:
+                self.debug_logger.info("Результат выполнения SSH команды", {
+                    "command": command,
+                    "phone": phone_number,
+                    "output_length": len(output),
+                    "output_lines": len(output.strip().split('\n')) if output else 0,
+                    "error": error if error else "нет ошибок",
+                    "output_preview": output[:500] if output else "пусто"  # Первые 500 символов
+                })
+
             if error and 'No such file' in error:
-                return {'success': False, 'entries': [], 'count': 0, 'error': 'Файл лога не найден'}
+                error_msg = 'Файл лога не найден'
+                if self.debug_logger:
+                    self.debug_logger.error("Файл лога не найден", {
+                        "log_path": log_path,
+                        "error": error
+                    })
+                return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
             # Парсим результаты
             entries = []
@@ -362,14 +443,31 @@ class LogServerConnector:
                     if line.strip():
                         entries.append(line)
 
-            return {
+            result = {
                 'success': True,
                 'entries': entries,
                 'count': len(entries)
             }
 
+            if self.debug_logger:
+                self.debug_logger.info("Результат поиска номера", {
+                    "phone": phone_number,
+                    "found_entries": len(entries),
+                    "entries_preview": entries[:3] if entries else []  # Первые 3 записи
+                })
+
+            return result
+
         except Exception as e:
-            return {'success': False, 'entries': [], 'count': 0, 'error': str(e)}
+            error_msg = str(e)
+            if self.debug_logger:
+                self.debug_logger.error("Ошибка при выполнении SSH команды", {
+                    "command": command,
+                    "phone": phone_number,
+                    "error": error_msg,
+                    "error_type": type(e).__name__
+                })
+            return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
     def check_campaign_delivery(self, phone_numbers):
         """Проверка доставки для списка номеров
@@ -378,32 +476,82 @@ class LogServerConnector:
             phone_numbers: list of phone numbers
 
         Returns:
-            dict: {'total': int, 'delivered': int, 'failed': int, 'details': dict}
+            dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
         """
+        if self.debug_logger:
+            self.debug_logger.info("Начало проверки доставки кампании", {
+                "total_phones": len(phone_numbers),
+                "phones_preview": phone_numbers[:5]  # Первые 5 номеров
+            })
+
         results = {
+            'success': True,
             'total': len(phone_numbers),
             'delivered': 0,
             'failed': 0,
             'details': {}
         }
 
-        for phone in phone_numbers:
-            search_result = self.search_phone_in_logs(phone)
+        try:
+            for i, phone in enumerate(phone_numbers, 1):
+                if self.debug_logger:
+                    self.debug_logger.info(f"Проверка номера {i}/{len(phone_numbers)}", {"phone": phone})
 
-            if search_result['success'] and search_result['count'] > 0:
-                results['delivered'] += 1
-                results['details'][phone] = {
-                    'status': 'delivered',
-                    'log_entries': search_result['count']
-                }
-            else:
-                results['failed'] += 1
-                results['details'][phone] = {
-                    'status': 'not_found',
-                    'log_entries': 0
-                }
+                search_result = self.search_phone_in_logs(phone)
 
-        return results
+                if search_result['success'] and search_result['count'] > 0:
+                    results['delivered'] += 1
+                    results['details'][phone] = {
+                        'delivered': True,
+                        'count': search_result['count'],
+                        'entries': search_result.get('entries', [])
+                    }
+                    if self.debug_logger:
+                        self.debug_logger.info(f"Номер найден в логах", {
+                            "phone": phone,
+                            "entries_count": search_result['count']
+                        })
+                else:
+                    results['failed'] += 1
+                    results['details'][phone] = {
+                        'delivered': False,
+                        'count': 0,
+                        'entries': []
+                    }
+                    if self.debug_logger:
+                        error = search_result.get('error', 'Не найдено в логах')
+                        self.debug_logger.info(f"Номер НЕ найден в логах", {
+                            "phone": phone,
+                            "reason": error
+                        })
+
+            if self.debug_logger:
+                self.debug_logger.info("Проверка доставки завершена", {
+                    "total": results['total'],
+                    "delivered": results['delivered'],
+                    "failed": results['failed'],
+                    "delivery_rate": f"{(results['delivered'] / results['total'] * 100):.1f}%" if results['total'] > 0 else "0%"
+                })
+
+            return results
+
+        except Exception as e:
+            error_msg = f"Ошибка при проверке доставки: {str(e)}"
+            if self.debug_logger:
+                self.debug_logger.error("Критическая ошибка при проверке доставки", {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "processed_phones": len(results['details']),
+                    "total_phones": len(phone_numbers)
+                })
+            return {
+                'success': False,
+                'error': error_msg,
+                'total': len(phone_numbers),
+                'delivered': results['delivered'],
+                'failed': results['failed'],
+                'details': results['details']
+            }
 
 
 class LoginWindow:
@@ -564,7 +712,7 @@ class IVRCallerApp:
         self.debug_logger.info("Приложение запущено", {"version": "v5", "user": username, "theme": self.current_theme})
 
         # Подключение к лог-серверу
-        self.log_server = LogServerConnector(self.config)
+        self.log_server = LogServerConnector(self.config, self.debug_logger)
         # Создаем секцию log_server в конфиге, если её нет
         self.log_server.get_connection_params()
 
