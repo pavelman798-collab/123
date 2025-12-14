@@ -501,28 +501,27 @@ class LogServerConnector:
                 })
             return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
-    def check_campaign_delivery(self, phone_numbers):
-        """Проверка доставки для списка номеров (оптимизированная с батчингом)
+    def check_campaign_delivery(self, phones_data):
+        """Проверка доставки с проверкой CONNID (оптимизированная с батчингом)
 
         Args:
-            phone_numbers: list of phone numbers
+            phones_data: list of dicts with 'number' and 'connid'
 
         Returns:
             dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
         """
-        BATCH_SIZE = 50  # Максимум номеров в одном запросе (безопасно для командной строки)
+        BATCH_SIZE = 50  # Максимум номеров в одном запросе
 
         if self.debug_logger:
-            self.debug_logger.info("Начало проверки доставки кампании (с батчингом)", {
-                "total_phones": len(phone_numbers),
+            self.debug_logger.info("Начало проверки доставки с проверкой CONNID", {
+                "total_phones": len(phones_data),
                 "batch_size": BATCH_SIZE,
-                "batches_count": (len(phone_numbers) + BATCH_SIZE - 1) // BATCH_SIZE,
-                "phones_preview": phone_numbers[:5]
+                "batches_count": (len(phones_data) + BATCH_SIZE - 1) // BATCH_SIZE
             })
 
         results = {
             'success': True,
-            'total': len(phone_numbers),
+            'total': len(phones_data),
             'delivered': 0,
             'failed': 0,
             'details': {}
@@ -534,22 +533,27 @@ class LogServerConnector:
                     return {
                         'success': False,
                         'error': 'Не удалось подключиться к лог-серверу',
-                        'total': len(phone_numbers),
+                        'total': len(phones_data),
                         'delivered': 0,
-                        'failed': len(phone_numbers),
+                        'failed': len(phones_data),
                         'details': {}
                     }
 
             params = self.get_connection_params()
             log_path = os.path.join(params['log_dir'], params['log_file'])
 
-            # Очищаем все номера от спецсимволов
+            # Создаем словари: телефон -> CONNID и clean_phone -> оригинальный номер
+            phone_to_connid = {}
             clean_phones = {}
-            for phone in phone_numbers:
-                clean_phone = phone.replace('+', '').replace('-', '').replace(' ', '')
-                clean_phones[clean_phone] = phone
+            for phone_info in phones_data:
+                phone = phone_info.get('number', '')
+                connid = phone_info.get('connid', '')
+                if phone:
+                    clean_phone = phone.replace('+', '').replace('-', '').replace(' ', '')
+                    phone_to_connid[phone] = connid
+                    clean_phones[clean_phone] = phone
 
-            # Разбиваем на батчи для безопасности
+            # Разбиваем на батчи
             phone_list = list(clean_phones.keys())
             found_phones = {}
 
@@ -565,44 +569,66 @@ class LogServerConnector:
                 if self.debug_logger:
                     self.debug_logger.info(f"Выполнение батча {batch_num}/{total_batches}", {
                         "command_length": len(command),
-                        "phones_in_batch": len(batch),
-                        "log_path": log_path
+                        "phones_in_batch": len(batch)
                     })
 
-                # Выполняем grep для батча
+                # Выполняем grep
                 stdin, stdout, stderr = self.client.exec_command(command)
                 output = stdout.read().decode('utf-8')
-                error = stderr.read().decode('utf-8')
 
-                if self.debug_logger:
-                    self.debug_logger.info(f"Результат батча {batch_num}/{total_batches}", {
-                        "output_length": len(output),
-                        "output_lines": len(output.strip().split('\n')) if output else 0,
-                        "error": error if error else "нет ошибок"
-                    })
-
-                # Парсим результаты батча
+                # Парсим результаты батча с проверкой CONNID
                 if output:
                     lines = output.strip().split('\n')
                     for line in lines:
                         if not line.strip():
                             continue
-                        # Проверяем какой номер содержится в этой строке
+
+                        # Проверяем какой номер и CONNID в строке
                         for clean_phone in batch:
                             if clean_phone in line:
                                 original_phone = clean_phones[clean_phone]
-                                if original_phone not in found_phones:
-                                    found_phones[original_phone] = []
-                                found_phones[original_phone].append(line)
+                                expected_connid = phone_to_connid.get(original_phone, '')
 
-            # Формируем результаты для каждого номера
-            for phone in phone_numbers:
+                                # Проверяем CONNID в логе
+                                if expected_connid and expected_connid in line:
+                                    # Парсим JSON из лога
+                                    try:
+                                        # Извлекаем только START_CALL_TIME и GSW_CALLING_LIST
+                                        log_data = {}
+                                        if 'START_CALL_TIME' in line:
+                                            # Простой парсинг через поиск подстроки
+                                            start_idx = line.find('"START_CALL_TIME":"')
+                                            if start_idx != -1:
+                                                start_idx += len('"START_CALL_TIME":"')
+                                                end_idx = line.find('"', start_idx)
+                                                if end_idx != -1:
+                                                    log_data['START_CALL_TIME'] = line[start_idx:end_idx]
+
+                                        if 'GSW_CALLING_LIST' in line:
+                                            start_idx = line.find('"GSW_CALLING_LIST":"')
+                                            if start_idx != -1:
+                                                start_idx += len('"GSW_CALLING_LIST":"')
+                                                end_idx = line.find('"', start_idx)
+                                                if end_idx != -1:
+                                                    log_data['GSW_CALLING_LIST'] = line[start_idx:end_idx]
+
+                                        log_data['CONNID'] = expected_connid
+
+                                        if original_phone not in found_phones:
+                                            found_phones[original_phone] = []
+                                        found_phones[original_phone].append(log_data)
+                                    except:
+                                        pass
+
+            # Формируем результаты
+            for phone_info in phones_data:
+                phone = phone_info.get('number', '')
                 if phone in found_phones:
                     results['delivered'] += 1
                     results['details'][phone] = {
                         'delivered': True,
                         'count': len(found_phones[phone]),
-                        'entries': found_phones[phone][:3]  # Возвращаем только первые 3 записи
+                        'entries': found_phones[phone][:3]  # Только первые 3 записи
                     }
                 else:
                     results['failed'] += 1
@@ -612,15 +638,15 @@ class LogServerConnector:
                         'entries': []
                     }
 
-            total_batches = (len(phone_numbers) + BATCH_SIZE - 1) // BATCH_SIZE
+            total_batches = (len(phones_data) + BATCH_SIZE - 1) // BATCH_SIZE
             if self.debug_logger:
-                self.debug_logger.info("Проверка доставки завершена (с батчингом)", {
+                self.debug_logger.info("Проверка доставки с CONNID завершена", {
                     "total": results['total'],
                     "delivered": results['delivered'],
                     "failed": results['failed'],
                     "delivery_rate": f"{(results['delivered'] / results['total'] * 100):.1f}%" if results['total'] > 0 else "0%",
                     "batches_used": total_batches,
-                    "speed": f"{total_batches} запросов вместо {len(phone_numbers)}"
+                    "connid_verified": "да"
                 })
 
             return results
@@ -631,12 +657,12 @@ class LogServerConnector:
                 self.debug_logger.error("Критическая ошибка при проверке доставки", {
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "total_phones": len(phone_numbers)
+                    "total_phones": len(phones_data)
                 })
             return {
                 'success': False,
                 'error': error_msg,
-                'total': len(phone_numbers),
+                'total': len(phones_data),
                 'delivered': results['delivered'],
                 'failed': results['failed'],
                 'details': results['details']
@@ -1974,16 +2000,10 @@ class IVRCallerApp:
             )
             return
 
-        # Извлекаем номера телефонов
+        # Извлекаем номера телефонов с CONNID
         phones_data = campaign.get('phones_data', [])
         if not phones_data:
             messagebox.showwarning("Внимание", "В кампании нет номеров телефонов")
-            return
-
-        phone_numbers = [phone.get('number', '') for phone in phones_data if phone.get('number')]
-
-        if not phone_numbers:
-            messagebox.showwarning("Внимание", "Не удалось извлечь номера телефонов")
             return
 
         # Показываем окно ожидания
@@ -2002,7 +2022,7 @@ class IVRCallerApp:
 
         tk.Label(
             progress_window,
-            text=f"Проверка {len(phone_numbers)} номеров",
+            text=f"Проверка {len(phones_data)} номеров",
             font=("Roboto", 10),
             fg='gray'
         ).pack()
@@ -2010,8 +2030,8 @@ class IVRCallerApp:
         progress_window.update()
 
         try:
-            # Проверяем доставку
-            result = self.log_server.check_campaign_delivery(phone_numbers)
+            # Проверяем доставку (передаем phones_data с CONNID)
+            result = self.log_server.check_campaign_delivery(phones_data)
 
             progress_window.destroy()
 
@@ -2596,12 +2616,14 @@ class IVRCallerApp:
             request_info = {
                 "url": self.config.api_url,
                 "status": "success" if request_result else "failed",
-                "request_json": request_data  # Полный JSON запроса
+                "request_json": request_data,  # Полный JSON запроса
+                "connid": request_data.get('CONNID', '')  # Сохраняем CONNID отдельно для проверки
             }
 
             # Обновляем phone_data с информацией о запросе
             if campaign_extra and 'phones_data' in campaign_extra and i < len(campaign_extra['phones_data']):
                 campaign_extra['phones_data'][i]['request_info'] = request_info
+                campaign_extra['phones_data'][i]['connid'] = request_data.get('CONNID', '')  # Для быстрого доступа
 
             if request_result:
                 success += 1
