@@ -26,6 +26,14 @@ except ImportError:
     HAS_PSYCOPG2 = False
     print("⚠️ psycopg2 не установлен. БД недоступна.")
 
+# Попытка импорта paramiko для SSH
+try:
+    import paramiko
+    HAS_PARAMIKO = True
+except ImportError:
+    HAS_PARAMIKO = False
+    print("⚠️ paramiko не установлен. Подключение к лог-серверу недоступно.")
+
 
 # ============== ПУТИ К ФАЙЛАМ ==============
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -274,6 +282,158 @@ class Config:
         self.config.set('auth', key, value)
         with open(self.config_path, 'w', encoding='utf-8') as f:
             self.config.write(f)
+
+
+class LogServerConnector:
+    """Подключение к лог-серверу по SSH и парсинг логов"""
+
+    def __init__(self, config):
+        self.config = config
+        self.client = None
+        self.connected = False
+
+    def get_connection_params(self):
+        """Получить параметры подключения из конфига"""
+        if not self.config.config.has_section('log_server'):
+            # Создаем секцию с параметрами по умолчанию
+            self.config.config['log_server'] = {
+                'host': '',  # Адрес сервера (укажите сами)
+                'port': '22',
+                'username': '',  # Имя пользователя (укажите сами)
+                'password': '',  # Пароль (укажите сами)
+                'log_dir': '/opt/log/fm2/',
+                'log_file': 'fm2.log'
+            }
+            with open(self.config.config_path, 'w', encoding='utf-8') as f:
+                self.config.config.write(f)
+            print("⚠️ Добавлена секция [log_server] в config.ini. Укажите параметры подключения.")
+
+        return {
+            'host': self.config.config.get('log_server', 'host'),
+            'port': self.config.config.getint('log_server', 'port', fallback=22),
+            'username': self.config.config.get('log_server', 'username'),
+            'password': self.config.config.get('log_server', 'password'),
+            'log_dir': self.config.config.get('log_server', 'log_dir', fallback='/opt/log/fm2/'),
+            'log_file': self.config.config.get('log_server', 'log_file', fallback='fm2.log')
+        }
+
+    def connect(self):
+        """Подключение к серверу по SSH"""
+        if not HAS_PARAMIKO:
+            print("⚠️ paramiko не установлен. Установите: pip install paramiko")
+            return False
+
+        params = self.get_connection_params()
+
+        if not params['host'] or not params['username'] or not params['password']:
+            print("⚠️ Не указаны параметры подключения к лог-серверу в config.ini")
+            return False
+
+        try:
+            self.client = paramiko.SSHClient()
+            self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            self.client.connect(
+                hostname=params['host'],
+                port=params['port'],
+                username=params['username'],
+                password=params['password'],
+                timeout=10
+            )
+            self.connected = True
+            print(f"✅ Подключено к лог-серверу: {params['host']}")
+            return True
+        except Exception as e:
+            print(f"❌ Ошибка подключения к лог-серверу: {e}")
+            self.connected = False
+            return False
+
+    def disconnect(self):
+        """Отключение от сервера"""
+        if self.client:
+            self.client.close()
+            self.connected = False
+            print("🔌 Отключено от лог-сервера")
+
+    def search_phone_in_logs(self, phone_number):
+        """Поиск телефонного номера в логах
+
+        Args:
+            phone_number: номер телефона для поиска
+
+        Returns:
+            dict: {'success': bool, 'entries': list, 'count': int}
+        """
+        if not self.connected:
+            if not self.connect():
+                return {'success': False, 'entries': [], 'count': 0, 'error': 'Нет подключения'}
+
+        params = self.get_connection_params()
+        log_path = os.path.join(params['log_dir'], params['log_file'])
+
+        # Очищаем номер от спецсимволов для поиска
+        clean_phone = phone_number.replace('+', '').replace('-', '').replace(' ', '')
+
+        # Формируем команду grep
+        command = f"grep '{clean_phone}' {log_path}"
+
+        try:
+            stdin, stdout, stderr = self.client.exec_command(command)
+            output = stdout.read().decode('utf-8')
+            error = stderr.read().decode('utf-8')
+
+            if error and 'No such file' in error:
+                return {'success': False, 'entries': [], 'count': 0, 'error': 'Файл лога не найден'}
+
+            # Парсим результаты
+            entries = []
+            if output:
+                lines = output.strip().split('\n')
+                for line in lines:
+                    if line.strip():
+                        entries.append(line)
+
+            return {
+                'success': True,
+                'entries': entries,
+                'count': len(entries)
+            }
+
+        except Exception as e:
+            return {'success': False, 'entries': [], 'count': 0, 'error': str(e)}
+
+    def check_campaign_delivery(self, phone_numbers):
+        """Проверка доставки для списка номеров
+
+        Args:
+            phone_numbers: list of phone numbers
+
+        Returns:
+            dict: {'total': int, 'delivered': int, 'failed': int, 'details': dict}
+        """
+        results = {
+            'total': len(phone_numbers),
+            'delivered': 0,
+            'failed': 0,
+            'details': {}
+        }
+
+        for phone in phone_numbers:
+            search_result = self.search_phone_in_logs(phone)
+
+            if search_result['success'] and search_result['count'] > 0:
+                results['delivered'] += 1
+                results['details'][phone] = {
+                    'status': 'delivered',
+                    'log_entries': search_result['count']
+                }
+            else:
+                results['failed'] += 1
+                results['details'][phone] = {
+                    'status': 'not_found',
+                    'log_entries': 0
+                }
+
+        return results
 
 
 class DatabaseManager:
