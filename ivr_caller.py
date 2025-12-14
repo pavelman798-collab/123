@@ -675,10 +675,11 @@ class LogServerConnector:
                                         if end_idx != -1:
                                             log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
 
-                                # Добавляем запись (ВСЕ записи, не только 3!)
-                                if connid not in found_data:
-                                    found_data[connid] = []
-                                found_data[connid].append(log_entry)
+                                # Добавляем запись ТОЛЬКО если в ней есть хотя бы одно из полей!
+                                if log_entry:  # Не пустой словарь
+                                    if connid not in found_data:
+                                        found_data[connid] = []
+                                    found_data[connid].append(log_entry)
                                 break  # Нашли CONNID, переходим к следующей строке
 
             # Формируем результаты для каждого телефона
