@@ -502,7 +502,7 @@ class LogServerConnector:
             return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
     def check_campaign_delivery(self, phone_numbers):
-        """Проверка доставки для списка номеров (оптимизированная версия)
+        """Проверка доставки для списка номеров (оптимизированная с батчингом)
 
         Args:
             phone_numbers: list of phone numbers
@@ -510,9 +510,13 @@ class LogServerConnector:
         Returns:
             dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
         """
+        BATCH_SIZE = 50  # Максимум номеров в одном запросе (безопасно для командной строки)
+
         if self.debug_logger:
-            self.debug_logger.info("Начало проверки доставки кампании (оптимизированная)", {
+            self.debug_logger.info("Начало проверки доставки кампании (с батчингом)", {
                 "total_phones": len(phone_numbers),
+                "batch_size": BATCH_SIZE,
+                "batches_count": (len(phone_numbers) + BATCH_SIZE - 1) // BATCH_SIZE,
                 "phones_preview": phone_numbers[:5]
             })
 
@@ -545,42 +549,51 @@ class LogServerConnector:
                 clean_phone = phone.replace('+', '').replace('-', '').replace(' ', '')
                 clean_phones[clean_phone] = phone
 
-            # Формируем одну команду grep для всех номеров через | (OR)
-            pattern = '|'.join(clean_phones.keys())
-            command = f"grep -E '{pattern}' {log_path}"
-
-            if self.debug_logger:
-                self.debug_logger.info("Выполнение оптимизированного поиска (все номера в одном запросе)", {
-                    "command": command,
-                    "phones_count": len(phone_numbers),
-                    "log_path": log_path
-                })
-
-            # Выполняем один grep для всех номеров
-            stdin, stdout, stderr = self.client.exec_command(command)
-            output = stdout.read().decode('utf-8')
-            error = stderr.read().decode('utf-8')
-
-            if self.debug_logger:
-                self.debug_logger.info("Результат оптимизированного поиска", {
-                    "output_length": len(output),
-                    "output_lines": len(output.strip().split('\n')) if output else 0,
-                    "error": error if error else "нет ошибок"
-                })
-
-            # Парсим результаты - подсчитываем вхождения каждого номера
+            # Разбиваем на батчи для безопасности
+            phone_list = list(clean_phones.keys())
             found_phones = {}
-            if output:
-                lines = output.strip().split('\n')
-                for line in lines:
-                    if not line.strip():
-                        continue
-                    # Проверяем какой номер содержится в этой строке
-                    for clean_phone, original_phone in clean_phones.items():
-                        if clean_phone in line:
-                            if original_phone not in found_phones:
-                                found_phones[original_phone] = []
-                            found_phones[original_phone].append(line)
+
+            for batch_idx in range(0, len(phone_list), BATCH_SIZE):
+                batch = phone_list[batch_idx:batch_idx + BATCH_SIZE]
+                batch_num = (batch_idx // BATCH_SIZE) + 1
+                total_batches = (len(phone_list) + BATCH_SIZE - 1) // BATCH_SIZE
+
+                # Формируем команду grep для батча
+                pattern = '|'.join(batch)
+                command = f"grep -E '{pattern}' {log_path}"
+
+                if self.debug_logger:
+                    self.debug_logger.info(f"Выполнение батча {batch_num}/{total_batches}", {
+                        "command_length": len(command),
+                        "phones_in_batch": len(batch),
+                        "log_path": log_path
+                    })
+
+                # Выполняем grep для батча
+                stdin, stdout, stderr = self.client.exec_command(command)
+                output = stdout.read().decode('utf-8')
+                error = stderr.read().decode('utf-8')
+
+                if self.debug_logger:
+                    self.debug_logger.info(f"Результат батча {batch_num}/{total_batches}", {
+                        "output_length": len(output),
+                        "output_lines": len(output.strip().split('\n')) if output else 0,
+                        "error": error if error else "нет ошибок"
+                    })
+
+                # Парсим результаты батча
+                if output:
+                    lines = output.strip().split('\n')
+                    for line in lines:
+                        if not line.strip():
+                            continue
+                        # Проверяем какой номер содержится в этой строке
+                        for clean_phone in batch:
+                            if clean_phone in line:
+                                original_phone = clean_phones[clean_phone]
+                                if original_phone not in found_phones:
+                                    found_phones[original_phone] = []
+                                found_phones[original_phone].append(line)
 
             # Формируем результаты для каждого номера
             for phone in phone_numbers:
@@ -599,13 +612,15 @@ class LogServerConnector:
                         'entries': []
                     }
 
+            total_batches = (len(phone_numbers) + BATCH_SIZE - 1) // BATCH_SIZE
             if self.debug_logger:
-                self.debug_logger.info("Проверка доставки завершена (оптимизированная)", {
+                self.debug_logger.info("Проверка доставки завершена (с батчингом)", {
                     "total": results['total'],
                     "delivered": results['delivered'],
                     "failed": results['failed'],
                     "delivery_rate": f"{(results['delivered'] / results['total'] * 100):.1f}%" if results['total'] > 0 else "0%",
-                    "speed": "одинзапрос вместо " + str(len(phone_numbers))
+                    "batches_used": total_batches,
+                    "speed": f"{total_batches} запросов вместо {len(phone_numbers)}"
                 })
 
             return results
