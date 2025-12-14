@@ -157,6 +157,38 @@ FALLBACK_EMPLOYEES = {
 # =============================================
 
 
+class ToolTip:
+    """Всплывающая подсказка для виджетов"""
+
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tip_window = None
+        self.widget.bind('<Enter>', self.show_tip)
+        self.widget.bind('<Leave>', self.hide_tip)
+
+    def show_tip(self, event=None):
+        if self.tip_window or not self.text:
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        self.tip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(
+            tw, text=self.text, justify=tk.LEFT,
+            background="#FFFFCC", relief=tk.SOLID, borderwidth=1,
+            font=("Roboto", 9), padx=10, pady=5
+        )
+        label.pack()
+
+    def hide_tip(self, event=None):
+        tw = self.tip_window
+        self.tip_window = None
+        if tw:
+            tw.destroy()
+
+
 class DebugLogger:
     """Детальное логирование для отладки"""
 
@@ -1533,17 +1565,34 @@ class IVRCallerApp:
         self.completed_tree.heading("date", text="Дата и время")
         self.completed_tree.heading("type", text="Тип")
         self.completed_tree.heading("phones", text="Всего номеров")
-        self.completed_tree.heading("success", text="Успешно")
-        self.completed_tree.heading("fail", text="Ошибок")
+        self.completed_tree.heading("success", text="✅ Успешно ❓")
+        self.completed_tree.heading("fail", text="❌ Ошибок ❓")
 
         self.completed_tree.column("status", width=100, anchor=tk.CENTER)
         self.completed_tree.column("date", width=180, anchor=tk.CENTER)
         self.completed_tree.column("type", width=200, anchor=tk.W)
         self.completed_tree.column("phones", width=120, anchor=tk.CENTER)
-        self.completed_tree.column("success", width=100, anchor=tk.CENTER)
-        self.completed_tree.column("fail", width=100, anchor=tk.CENTER)
+        self.completed_tree.column("success", width=120, anchor=tk.CENTER)
+        self.completed_tree.column("fail", width=120, anchor=tk.CENTER)
 
         self.completed_tree.pack(fill=tk.BOTH, expand=True)
+
+        # Панель с пояснениями
+        help_frame = tk.Frame(tree_frame, bg='#F0F8FF', relief=tk.GROOVE, borderwidth=1)
+        help_frame.pack(fill=tk.X, pady=(5, 0))
+
+        help_text = "ℹ️  Успешно: количество запросов принятых API сервером (HTTP 200) • Ошибок: количество запросов с ошибками отправки"
+        help_label = tk.Label(
+            help_frame,
+            text=help_text,
+            bg='#F0F8FF',
+            fg='#333333',
+            font=("Roboto", 9),
+            anchor=tk.W,
+            padx=10,
+            pady=5
+        )
+        help_label.pack(fill=tk.X)
 
         # Двойной клик для просмотра детальной информации
         self.completed_tree.bind("<Double-Button-1>", lambda e: self.view_campaign_details("completed"))
