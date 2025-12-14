@@ -43,6 +43,7 @@ LOG_FILE = os.path.join(BASE_DIR, "ivr_log.txt")
 DEBUG_LOG_FILE = os.path.join(BASE_DIR, "debug.log")
 HISTORY_FILE = os.path.join(BASE_DIR, "campaigns_history.json")
 SAVED_VALUES_FILE = os.path.join(BASE_DIR, "saved_values.json")
+DELIVERY_CACHE_FILE = os.path.join(BASE_DIR, "delivery_cache.json")
 THEME_FILE = os.path.join(BASE_DIR, "theme.txt")
 # ===========================================
 
@@ -188,6 +189,30 @@ class ToolTip:
         self.tip_window = None
         if tw:
             tw.destroy()
+
+
+def make_text_readonly(text_widget):
+    """Делает Text виджет только для чтения, но с возможностью копирования
+
+    Args:
+        text_widget: tk.Text виджет
+    """
+    # Блокируем все попытки изменения, кроме навигации и копирования
+    def block_edit(event):
+        # Разрешаем только навигацию и копирование (Ctrl+C, Ctrl+A)
+        if event.keysym in ('c', 'C', 'a', 'A') and (event.state & 0x4):  # Ctrl нажат
+            return  # Разрешаем Ctrl+C и Ctrl+A
+        if event.keysym in ('Left', 'Right', 'Up', 'Down', 'Home', 'End', 'Prior', 'Next'):
+            return  # Разрешаем навигацию
+        return "break"  # Блокируем все остальное
+
+    text_widget.bind('<Key>', block_edit)
+
+    # Блокируем вставку через правую кнопку мыши
+    text_widget.bind('<Button-3>', lambda e: None)
+
+    # Разрешаем выделение мышью
+    # (по умолчанию работает, ничего делать не нужно)
 
 
 class DebugLogger:
@@ -352,6 +377,60 @@ class SavedValues:
         return self.data.get(category, [])
 
 
+class DeliveryCache:
+    """Кэш результатов проверки доставки по CONNID"""
+
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.cache = {}  # CONNID -> {delivered: bool, entries: [...], timestamp: str}
+        self.load()
+
+    def load(self):
+        """Загрузить кэш из файла"""
+        if os.path.exists(self.file_path):
+            try:
+                with open(self.file_path, 'r', encoding='utf-8') as f:
+                    self.cache = json.load(f)
+            except Exception as e:
+                print(f"⚠️ Ошибка загрузки кэша доставки: {e}")
+                self.cache = {}
+
+    def save(self):
+        """Сохранить кэш в файл"""
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                json.dump(self.cache, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"⚠️ Ошибка сохранения кэша доставки: {e}")
+
+    def get(self, connid):
+        """Получить результат из кэша для CONNID
+
+        Returns:
+            dict or None: {delivered: bool, entries: [...]} или None если нет в кэше
+        """
+        return self.cache.get(connid)
+
+    def set(self, connid, delivered, entries):
+        """Сохранить результат в кэш для CONNID"""
+        self.cache[connid] = {
+            'delivered': delivered,
+            'entries': entries,
+            'timestamp': datetime.now().isoformat()
+        }
+        self.save()
+
+    def has_successful_delivery(self, connid):
+        """Проверить есть ли в кэше успешная доставка для CONNID"""
+        cached = self.get(connid)
+        return cached is not None and cached.get('delivered', False) and len(cached.get('entries', [])) > 0
+
+    def clear(self):
+        """Очистить кэш"""
+        self.cache = {}
+        self.save()
+
+
 class LogServerConnector:
     """Подключение к лог-серверу по SSH и парсинг логов"""
 
@@ -360,6 +439,7 @@ class LogServerConnector:
         self.client = None
         self.connected = False
         self.debug_logger = debug_logger
+        self.delivery_cache = DeliveryCache(DELIVERY_CACHE_FILE)
 
     def get_connection_params(self):
         """Получить параметры подключения из конфига"""
@@ -567,11 +647,12 @@ class LogServerConnector:
                 })
             return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
-    def check_campaign_delivery(self, phones_data):
+    def check_campaign_delivery(self, phones_data, progress_callback=None):
         """Проверка доставки ТОЛЬКО по CONNID
 
         Args:
             phones_data: list of dicts with 'number' and 'connid'
+            progress_callback: функция для обновления прогресса (current, total, message)
 
         Returns:
             dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
@@ -623,64 +704,109 @@ class LogServerConnector:
                     self.debug_logger.error("Нет CONNID для проверки", {})
                 return results
 
-            # Разбиваем CONNID на батчи
+            # Проверяем кэш и разделяем CONNID на кэшированные и требующие проверки
             found_data = {}  # CONNID -> список записей
+            connids_to_check = []
+            cached_count = 0
 
-            for batch_idx in range(0, len(connid_list), BATCH_SIZE):
-                batch = connid_list[batch_idx:batch_idx + BATCH_SIZE]
-                batch_num = (batch_idx // BATCH_SIZE) + 1
-                total_batches = (len(connid_list) + BATCH_SIZE - 1) // BATCH_SIZE
+            for connid in connid_list:
+                if self.delivery_cache.has_successful_delivery(connid):
+                    # Используем данные из кэша
+                    cached_data = self.delivery_cache.get(connid)
+                    found_data[connid] = cached_data['entries']
+                    cached_count += 1
+                else:
+                    # Нужно проверить на сервере
+                    connids_to_check.append(connid)
 
-                # Ищем по CONNID, а НЕ по номеру телефона!
-                pattern = '|'.join(batch)
-                command = f"grep -E '{pattern}' {log_path}"
+            if self.debug_logger:
+                self.debug_logger.info("Использование кэша доставки", {
+                    "total_connids": len(connid_list),
+                    "cached": cached_count,
+                    "to_check": len(connids_to_check)
+                })
 
+            # Если все данные в кэше - пропускаем проверку на сервере
+            if not connids_to_check:
                 if self.debug_logger:
-                    self.debug_logger.info(f"Поиск по CONNID батч {batch_num}/{total_batches}", {
-                        "command_length": len(command),
-                        "connids_in_batch": len(batch)
-                    })
+                    self.debug_logger.info("Все данные получены из кэша", {})
+                # Обновляем прогресс до 100%
+                if progress_callback:
+                    progress_callback(1, 1, f"Все данные загружены из кэша ({cached_count} записей)")
+            else:
+                # Разбиваем CONNID на батчи для проверки на сервере
+                for batch_idx in range(0, len(connids_to_check), BATCH_SIZE):
+                    batch = connids_to_check[batch_idx:batch_idx + BATCH_SIZE]
+                    batch_num = (batch_idx // BATCH_SIZE) + 1
+                    total_batches = (len(connids_to_check) + BATCH_SIZE - 1) // BATCH_SIZE
 
-                stdin, stdout, stderr = self.client.exec_command(command)
-                output = stdout.read().decode('utf-8')
+                    # Обновляем прогресс
+                    if progress_callback:
+                        progress_callback(batch_num - 1, total_batches, f"Обработка батча {batch_num} из {total_batches}...")
 
-                # Парсим результаты - извлекаем ТОЛЬКО START_CALL_TIME и GSW_CALLING_LIST
-                if output:
-                    lines = output.strip().split('\n')
-                    for line in lines:
-                        if not line.strip():
-                            continue
+                    # Ищем по CONNID, а НЕ по номеру телефона!
+                    pattern = '|'.join(batch)
+                    command = f"grep -E '{pattern}' {log_path}"
 
-                        # Определяем какому CONNID принадлежит запись
-                        for connid in batch:
-                            if connid in line:
-                                # Извлекаем поля
-                                log_entry = {}
+                    if self.debug_logger:
+                        self.debug_logger.info(f"Поиск по CONNID батч {batch_num}/{total_batches}", {
+                            "command_length": len(command),
+                            "connids_in_batch": len(batch)
+                        })
 
-                                # START_CALL_TIME
-                                if 'START_CALL_TIME' in line:
-                                    start_idx = line.find('"START_CALL_TIME":"')
-                                    if start_idx != -1:
-                                        start_idx += len('"START_CALL_TIME":"')
-                                        end_idx = line.find('"', start_idx)
-                                        if end_idx != -1:
-                                            log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
+                    stdin, stdout, stderr = self.client.exec_command(command)
+                    output = stdout.read().decode('utf-8')
 
-                                # GSW_CALLING_LIST
-                                if 'GSW_CALLING_LIST' in line:
-                                    start_idx = line.find('"GSW_CALLING_LIST":"')
-                                    if start_idx != -1:
-                                        start_idx += len('"GSW_CALLING_LIST":"')
-                                        end_idx = line.find('"', start_idx)
-                                        if end_idx != -1:
-                                            log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
+                    # Парсим результаты - извлекаем ТОЛЬКО START_CALL_TIME и GSW_CALLING_LIST
+                    if output:
+                        lines = output.strip().split('\n')
+                        for line in lines:
+                            if not line.strip():
+                                continue
 
-                                # Добавляем запись ТОЛЬКО если в ней есть хотя бы одно из полей!
-                                if log_entry:  # Не пустой словарь
-                                    if connid not in found_data:
-                                        found_data[connid] = []
-                                    found_data[connid].append(log_entry)
-                                break  # Нашли CONNID, переходим к следующей строке
+                            # Определяем какому CONNID принадлежит запись
+                            for connid in batch:
+                                if connid in line:
+                                    # Извлекаем поля
+                                    log_entry = {}
+
+                                    # START_CALL_TIME
+                                    if 'START_CALL_TIME' in line:
+                                        start_idx = line.find('"START_CALL_TIME":"')
+                                        if start_idx != -1:
+                                            start_idx += len('"START_CALL_TIME":"')
+                                            end_idx = line.find('"', start_idx)
+                                            if end_idx != -1:
+                                                log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
+
+                                    # GSW_CALLING_LIST
+                                    if 'GSW_CALLING_LIST' in line:
+                                        start_idx = line.find('"GSW_CALLING_LIST":"')
+                                        if start_idx != -1:
+                                            start_idx += len('"GSW_CALLING_LIST":"')
+                                            end_idx = line.find('"', start_idx)
+                                            if end_idx != -1:
+                                                log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
+
+                                    # Добавляем запись ТОЛЬКО если в ней есть хотя бы одно из полей!
+                                    if log_entry:  # Не пустой словарь
+                                        if connid not in found_data:
+                                            found_data[connid] = []
+                                        found_data[connid].append(log_entry)
+                                    break  # Нашли CONNID, переходим к следующей строке
+
+                    # Обновляем прогресс после обработки батча
+                    if progress_callback:
+                        progress_callback(batch_num, total_batches, f"Батч {batch_num} из {total_batches} обработан")
+
+                # Сохраняем новые данные в кэш
+                for connid in connids_to_check:
+                    if connid in found_data and len(found_data[connid]) > 0:
+                        # Успешная доставка - сохраняем в кэш
+                        self.delivery_cache.set(connid, True, found_data[connid])
+                    else:
+                        # Не доставлено - сохраняем пустой результат (будет проверено при следующей попытке)
+                        self.delivery_cache.set(connid, False, [])
 
             # Формируем результаты для каждого телефона
             for phone_info in phones_data:
@@ -1883,6 +2009,21 @@ class IVRCallerApp:
 
         tk.Button(
             btn_frame,
+            text="📊 Проверить доставку",
+            font=("Roboto", 10, "bold"),
+            bg="#2196F3",  # Синий цвет для выделения
+            fg="white",
+            activebackground="#1976D2",
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
+            command=lambda: self.check_delivery_from_history("completed")
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        tk.Button(
+            btn_frame,
             text="Экспорт запросов",
             font=("Roboto", 10, "bold"),
             bg=self.colors['primary'],
@@ -2172,7 +2313,7 @@ class IVRCallerApp:
 
         # Вставляем содержимое
         text_widget.insert("1.0", content)
-        text_widget.config(state='disabled')  # Делаем только для чтения
+        make_text_readonly(text_widget)  # Делаем только для чтения, но с возможностью копирования
 
         # Рамка для кнопок
         btn_frame = ttk.Frame(detail_window)
@@ -2213,6 +2354,44 @@ class IVRCallerApp:
         )
         close_btn.pack(side=tk.LEFT, padx=5)
 
+    def check_delivery_from_history(self, tab_type):
+        """Проверка доставки выбранной кампании из истории"""
+        tree = self.queued_tree if tab_type == "queued" else self.completed_tree
+
+        selected = tree.selection()
+        if not selected:
+            messagebox.showwarning("Внимание", "Выберите кампанию из списка!")
+            return
+
+        # Получаем индекс выбранной кампании
+        item = selected[0]
+        values = tree.item(item, "values")
+
+        if not values:
+            return
+
+        # Находим кампанию в истории (по timestamp который в колонке "date")
+        timestamp_str = values[1]  # Второе значение - дата и время
+        history = self.load_history()
+
+        campaign = None
+        for h in history:
+            if h.get('timestamp', '') == timestamp_str:
+                campaign = h
+                break
+
+        if not campaign:
+            messagebox.showerror("Ошибка", "Не удалось найти кампанию в истории")
+            return
+
+        # Проверяем что есть phones_data
+        if not campaign.get('phones_data'):
+            messagebox.showwarning("Внимание", "В кампании нет данных о номерах телефонов")
+            return
+
+        # Вызываем проверку доставки
+        self.check_campaign_delivery_ui(campaign)
+
     def check_campaign_delivery_ui(self, campaign):
         """Проверка доставки кампании через лог-сервер"""
         if not HAS_PARAMIKO:
@@ -2230,32 +2409,65 @@ class IVRCallerApp:
             messagebox.showwarning("Внимание", "В кампании нет номеров телефонов")
             return
 
-        # Показываем окно ожидания
+        # Показываем окно с прогресс баром
         progress_window = tk.Toplevel(self.root)
         progress_window.title("Проверка доставки")
-        progress_window.geometry("400x150")
+        progress_window.geometry("450x180")
         progress_window.transient(self.root)
         progress_window.grab_set()
+        progress_window.resizable(False, False)
 
+        # Заголовок
         tk.Label(
             progress_window,
-            text="Подключение к лог-серверу...",
-            font=("Roboto", 12),
-            pady=20
+            text="Проверка доставки на лог-сервере",
+            font=("Roboto", 12, "bold"),
+            pady=15
         ).pack()
 
-        tk.Label(
+        # Информация о количестве
+        info_label = tk.Label(
             progress_window,
-            text=f"Проверка {len(phones_data)} номеров",
+            text=f"Проверка {len(phones_data)} номеров...",
             font=("Roboto", 10),
             fg='gray'
-        ).pack()
+        )
+        info_label.pack(pady=(0, 10))
+
+        # Прогресс бар
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(
+            progress_window,
+            variable=progress_var,
+            maximum=100,
+            length=350,
+            mode='determinate'
+        )
+        progress_bar.pack(pady=10)
+
+        # Текст прогресса
+        progress_text = tk.Label(
+            progress_window,
+            text="0%",
+            font=("Roboto", 10),
+            fg=self.colors['primary']
+        )
+        progress_text.pack()
 
         progress_window.update()
 
+        # Callback для обновления прогресса
+        def update_progress(current, total, message=""):
+            percent = (current / total * 100) if total > 0 else 0
+            progress_var.set(percent)
+            progress_text.config(text=f"{percent:.0f}% ({current}/{total})")
+            if message:
+                info_label.config(text=message)
+            progress_window.update()
+
         try:
-            # Проверяем доставку (передаем phones_data с CONNID)
-            result = self.log_server.check_campaign_delivery(phones_data)
+            # Проверяем доставку (передаем phones_data с CONNID и callback)
+            result = self.log_server.check_campaign_delivery(phones_data, progress_callback=update_progress)
 
             progress_window.destroy()
 
@@ -2373,7 +2585,7 @@ class IVRCallerApp:
             details_content += "\n"
 
         details_text.insert("1.0", details_content)
-        details_text.config(state='disabled')
+        make_text_readonly(details_text)  # Делаем текст только для чтения, но с возможностью копирования
 
         # Кнопка закрытия
         close_btn = tk.Button(
