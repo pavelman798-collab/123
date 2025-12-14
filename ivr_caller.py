@@ -42,6 +42,7 @@ CONNID_FILE = os.path.join(BASE_DIR, "connid.txt")
 LOG_FILE = os.path.join(BASE_DIR, "ivr_log.txt")
 DEBUG_LOG_FILE = os.path.join(BASE_DIR, "debug.log")
 HISTORY_FILE = os.path.join(BASE_DIR, "campaigns_history.json")
+SAVED_VALUES_FILE = os.path.join(BASE_DIR, "saved_values.json")
 THEME_FILE = os.path.join(BASE_DIR, "theme.txt")
 # ===========================================
 
@@ -286,6 +287,71 @@ class Config:
             self.config.write(f)
 
 
+class SavedValues:
+    """Класс для хранения сохраненных значений (номера, шаблоны, тексты) в JSON"""
+
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.data = {
+            'sender_phones': [],
+            'sms_templates': [],
+            'voice_texts': [],
+            'sms_texts': []
+        }
+        self.load()
+
+    def load(self):
+        """Загрузить сохраненные значения из файла"""
+        if os.path.exists(self.file_path):
+            try:
+                with open(self.file_path, 'r', encoding='utf-8') as f:
+                    loaded_data = json.load(f)
+                    # Обновляем только существующие категории
+                    for key in self.data.keys():
+                        if key in loaded_data:
+                            self.data[key] = loaded_data[key]
+            except Exception as e:
+                print(f"⚠️ Ошибка загрузки сохраненных значений: {e}")
+
+    def save(self):
+        """Сохранить значения в файл"""
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                json.dump(self.data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"⚠️ Ошибка сохранения значений: {e}")
+
+    def add_value(self, category, value):
+        """Добавить значение в категорию"""
+        if category not in self.data:
+            return False
+
+        # Убираем пробелы по краям
+        value = str(value).strip()
+
+        # Не добавляем пустые значения
+        if not value:
+            return False
+
+        # Не добавляем дубликаты
+        if value in self.data[category]:
+            return False
+
+        # Добавляем в начало списка (последние использованные - первые)
+        self.data[category].insert(0, value)
+
+        # Ограничиваем размер списка (максимум 50 значений)
+        if len(self.data[category]) > 50:
+            self.data[category] = self.data[category][:50]
+
+        self.save()
+        return True
+
+    def get_values(self, category):
+        """Получить список значений для категории"""
+        return self.data.get(category, [])
+
+
 class LogServerConnector:
     """Подключение к лог-серверу по SSH и парсинг логов"""
 
@@ -501,28 +567,26 @@ class LogServerConnector:
                 })
             return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
-    def check_campaign_delivery(self, phone_numbers):
-        """Проверка доставки для списка номеров (оптимизированная с батчингом)
+    def check_campaign_delivery(self, phones_data):
+        """Проверка доставки ТОЛЬКО по CONNID
 
         Args:
-            phone_numbers: list of phone numbers
+            phones_data: list of dicts with 'number' and 'connid'
 
         Returns:
             dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
         """
-        BATCH_SIZE = 50  # Максимум номеров в одном запросе (безопасно для командной строки)
+        BATCH_SIZE = 50
 
         if self.debug_logger:
-            self.debug_logger.info("Начало проверки доставки кампании (с батчингом)", {
-                "total_phones": len(phone_numbers),
-                "batch_size": BATCH_SIZE,
-                "batches_count": (len(phone_numbers) + BATCH_SIZE - 1) // BATCH_SIZE,
-                "phones_preview": phone_numbers[:5]
+            self.debug_logger.info("Начало проверки доставки ТОЛЬКО по CONNID", {
+                "total_phones": len(phones_data),
+                "batch_size": BATCH_SIZE
             })
 
         results = {
             'success': True,
-            'total': len(phone_numbers),
+            'total': len(phones_data),
             'delivered': 0,
             'failed': 0,
             'details': {}
@@ -534,77 +598,104 @@ class LogServerConnector:
                     return {
                         'success': False,
                         'error': 'Не удалось подключиться к лог-серверу',
-                        'total': len(phone_numbers),
+                        'total': len(phones_data),
                         'delivered': 0,
-                        'failed': len(phone_numbers),
+                        'failed': len(phones_data),
                         'details': {}
                     }
 
             params = self.get_connection_params()
             log_path = os.path.join(params['log_dir'], params['log_file'])
 
-            # Очищаем все номера от спецсимволов
-            clean_phones = {}
-            for phone in phone_numbers:
-                clean_phone = phone.replace('+', '').replace('-', '').replace(' ', '')
-                clean_phones[clean_phone] = phone
+            # Создаем словарь CONNID -> телефон
+            connid_to_phone = {}
+            connid_list = []
 
-            # Разбиваем на батчи для безопасности
-            phone_list = list(clean_phones.keys())
-            found_phones = {}
+            for phone_info in phones_data:
+                phone = phone_info.get('number', '')
+                connid = phone_info.get('connid', '')
+                if connid:  # Только если есть CONNID
+                    connid_to_phone[connid] = phone
+                    connid_list.append(connid)
 
-            for batch_idx in range(0, len(phone_list), BATCH_SIZE):
-                batch = phone_list[batch_idx:batch_idx + BATCH_SIZE]
+            if not connid_list:
+                if self.debug_logger:
+                    self.debug_logger.error("Нет CONNID для проверки", {})
+                return results
+
+            # Разбиваем CONNID на батчи
+            found_data = {}  # CONNID -> список записей
+
+            for batch_idx in range(0, len(connid_list), BATCH_SIZE):
+                batch = connid_list[batch_idx:batch_idx + BATCH_SIZE]
                 batch_num = (batch_idx // BATCH_SIZE) + 1
-                total_batches = (len(phone_list) + BATCH_SIZE - 1) // BATCH_SIZE
+                total_batches = (len(connid_list) + BATCH_SIZE - 1) // BATCH_SIZE
 
-                # Формируем команду grep для батча
+                # Ищем по CONNID, а НЕ по номеру телефона!
                 pattern = '|'.join(batch)
                 command = f"grep -E '{pattern}' {log_path}"
 
                 if self.debug_logger:
-                    self.debug_logger.info(f"Выполнение батча {batch_num}/{total_batches}", {
+                    self.debug_logger.info(f"Поиск по CONNID батч {batch_num}/{total_batches}", {
                         "command_length": len(command),
-                        "phones_in_batch": len(batch),
-                        "log_path": log_path
+                        "connids_in_batch": len(batch)
                     })
 
-                # Выполняем grep для батча
                 stdin, stdout, stderr = self.client.exec_command(command)
                 output = stdout.read().decode('utf-8')
-                error = stderr.read().decode('utf-8')
 
-                if self.debug_logger:
-                    self.debug_logger.info(f"Результат батча {batch_num}/{total_batches}", {
-                        "output_length": len(output),
-                        "output_lines": len(output.strip().split('\n')) if output else 0,
-                        "error": error if error else "нет ошибок"
-                    })
-
-                # Парсим результаты батча
+                # Парсим результаты - извлекаем ТОЛЬКО START_CALL_TIME и GSW_CALLING_LIST
                 if output:
                     lines = output.strip().split('\n')
                     for line in lines:
                         if not line.strip():
                             continue
-                        # Проверяем какой номер содержится в этой строке
-                        for clean_phone in batch:
-                            if clean_phone in line:
-                                original_phone = clean_phones[clean_phone]
-                                if original_phone not in found_phones:
-                                    found_phones[original_phone] = []
-                                found_phones[original_phone].append(line)
 
-            # Формируем результаты для каждого номера
-            for phone in phone_numbers:
-                if phone in found_phones:
+                        # Определяем какому CONNID принадлежит запись
+                        for connid in batch:
+                            if connid in line:
+                                # Извлекаем поля
+                                log_entry = {}
+
+                                # START_CALL_TIME
+                                if 'START_CALL_TIME' in line:
+                                    start_idx = line.find('"START_CALL_TIME":"')
+                                    if start_idx != -1:
+                                        start_idx += len('"START_CALL_TIME":"')
+                                        end_idx = line.find('"', start_idx)
+                                        if end_idx != -1:
+                                            log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
+
+                                # GSW_CALLING_LIST
+                                if 'GSW_CALLING_LIST' in line:
+                                    start_idx = line.find('"GSW_CALLING_LIST":"')
+                                    if start_idx != -1:
+                                        start_idx += len('"GSW_CALLING_LIST":"')
+                                        end_idx = line.find('"', start_idx)
+                                        if end_idx != -1:
+                                            log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
+
+                                # Добавляем запись (ВСЕ записи, не только 3!)
+                                if connid not in found_data:
+                                    found_data[connid] = []
+                                found_data[connid].append(log_entry)
+                                break  # Нашли CONNID, переходим к следующей строке
+
+            # Формируем результаты для каждого телефона
+            for phone_info in phones_data:
+                phone = phone_info.get('number', '')
+                connid = phone_info.get('connid', '')
+
+                if connid and connid in found_data:
+                    # Найдены записи для этого CONNID
                     results['delivered'] += 1
                     results['details'][phone] = {
                         'delivered': True,
-                        'count': len(found_phones[phone]),
-                        'entries': found_phones[phone][:3]  # Возвращаем только первые 3 записи
+                        'count': len(found_data[connid]),
+                        'entries': found_data[connid]  # ВСЕ записи
                     }
                 else:
+                    # Не найдено
                     results['failed'] += 1
                     results['details'][phone] = {
                         'delivered': False,
@@ -612,15 +703,15 @@ class LogServerConnector:
                         'entries': []
                     }
 
-            total_batches = (len(phone_numbers) + BATCH_SIZE - 1) // BATCH_SIZE
+            total_batches = (len(phones_data) + BATCH_SIZE - 1) // BATCH_SIZE
             if self.debug_logger:
-                self.debug_logger.info("Проверка доставки завершена (с батчингом)", {
+                self.debug_logger.info("Проверка доставки с CONNID завершена", {
                     "total": results['total'],
                     "delivered": results['delivered'],
                     "failed": results['failed'],
                     "delivery_rate": f"{(results['delivered'] / results['total'] * 100):.1f}%" if results['total'] > 0 else "0%",
                     "batches_used": total_batches,
-                    "speed": f"{total_batches} запросов вместо {len(phone_numbers)}"
+                    "connid_verified": "да"
                 })
 
             return results
@@ -631,12 +722,12 @@ class LogServerConnector:
                 self.debug_logger.error("Критическая ошибка при проверке доставки", {
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "total_phones": len(phone_numbers)
+                    "total_phones": len(phones_data)
                 })
             return {
                 'success': False,
                 'error': error_msg,
-                'total': len(phone_numbers),
+                'total': len(phones_data),
                 'delivered': results['delivered'],
                 'failed': results['failed'],
                 'details': results['details']
@@ -804,6 +895,9 @@ class IVRCallerApp:
         self.log_server = LogServerConnector(self.config, self.debug_logger)
         # Создаем секцию log_server в конфиге, если её нет
         self.log_server.get_connection_params()
+
+        # Сохраненные значения
+        self.saved_values = SavedValues(SAVED_VALUES_FILE)
 
         # CONNID
         self.current_connid = self._load_connid()
@@ -1030,13 +1124,30 @@ class IVRCallerApp:
         text_card = self.create_card(frame_inner, title="✉ Содержимое сообщений", pady=15)
 
         # Поле для озвучивания
+        voice_label_frame = tk.Frame(text_card, bg=self.colors['card_bg'])
+        voice_label_frame.pack(fill=tk.X, pady=(5, 8))
+
         tk.Label(
-            text_card,
+            voice_label_frame,
             text="📞 Текст для озвучивания при звонке",
             font=("Roboto", 12, "bold"),
             bg=self.colors['card_bg'],
             fg=self.colors['fg']
-        ).pack(anchor=tk.W, pady=(5, 8))
+        ).pack(side=tk.LEFT)
+
+        # Кнопка для сохранения текста озвучивания
+        save_voice_btn = tk.Button(
+            voice_label_frame,
+            text="+",
+            font=("Roboto", 12, "bold"),
+            bg=self.colors['primary'],
+            fg='white',
+            relief=tk.FLAT,
+            width=2,
+            cursor='hand2',
+            command=lambda: self.save_text_value('voice_texts')
+        )
+        save_voice_btn.pack(side=tk.LEFT, padx=(10, 0))
 
         self.voice_text = tk.Text(
             text_card,
@@ -1048,16 +1159,55 @@ class IVRCallerApp:
             padx=10,
             pady=8
         )
-        self.voice_text.pack(fill=tk.X, pady=(0, 20))
+        self.voice_text.pack(fill=tk.X, pady=(0, 5))
+
+        # Combobox для выбора сохраненного текста озвучивания
+        voice_history_frame = tk.Frame(text_card, bg=self.colors['card_bg'])
+        voice_history_frame.pack(fill=tk.X, pady=(0, 20))
+
+        tk.Label(
+            voice_history_frame,
+            text="📋 Сохраненные тексты:",
+            font=("Roboto", 9),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text_muted']
+        ).pack(side=tk.LEFT, padx=(0, 5))
+
+        self.voice_text_combo = ttk.Combobox(
+            voice_history_frame,
+            font=("Roboto", 9),
+            width=40,
+            values=self.saved_values.get_values('voice_texts'),
+            state='readonly'
+        )
+        self.voice_text_combo.pack(side=tk.LEFT)
+        self.voice_text_combo.bind('<<ComboboxSelected>>', lambda e: self.load_text_value('voice_texts'))
 
         # Поле для СМС
+        sms_label_frame = tk.Frame(text_card, bg=self.colors['card_bg'])
+        sms_label_frame.pack(fill=tk.X, pady=(5, 8))
+
         tk.Label(
-            text_card,
+            sms_label_frame,
             text="📱 Текст для СМС",
             font=("Roboto", 12, "bold"),
             bg=self.colors['card_bg'],
             fg=self.colors['fg']
-        ).pack(anchor=tk.W, pady=(5, 8))
+        ).pack(side=tk.LEFT)
+
+        # Кнопка для сохранения текста СМС
+        save_sms_btn = tk.Button(
+            sms_label_frame,
+            text="+",
+            font=("Roboto", 12, "bold"),
+            bg=self.colors['primary'],
+            fg='white',
+            relief=tk.FLAT,
+            width=2,
+            cursor='hand2',
+            command=lambda: self.save_text_value('sms_texts')
+        )
+        save_sms_btn.pack(side=tk.LEFT, padx=(10, 0))
 
         self.sms_text = tk.Text(
             text_card,
@@ -1069,7 +1219,29 @@ class IVRCallerApp:
             padx=10,
             pady=8
         )
-        self.sms_text.pack(fill=tk.X)
+        self.sms_text.pack(fill=tk.X, pady=(0, 5))
+
+        # Combobox для выбора сохраненного текста СМС
+        sms_history_frame = tk.Frame(text_card, bg=self.colors['card_bg'])
+        sms_history_frame.pack(fill=tk.X, pady=(0, 0))
+
+        tk.Label(
+            sms_history_frame,
+            text="📋 Сохраненные тексты:",
+            font=("Roboto", 9),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text_muted']
+        ).pack(side=tk.LEFT, padx=(0, 5))
+
+        self.sms_text_combo = ttk.Combobox(
+            sms_history_frame,
+            font=("Roboto", 9),
+            width=40,
+            values=self.saved_values.get_values('sms_texts'),
+            state='readonly'
+        )
+        self.sms_text_combo.pack(side=tk.LEFT)
+        self.sms_text_combo.bind('<<ComboboxSelected>>', lambda e: self.load_text_value('sms_texts'))
 
         # === КАРТОЧКА 3: Загрузка номеров ===
         file_card = self.create_card(frame_inner, title="📂 Загрузка номеров телефонов", pady=15)
@@ -1177,15 +1349,28 @@ class IVRCallerApp:
         sender_frame.pack(fill=tk.X, pady=(0, 5))
 
         self.sender_phone = tk.StringVar()
-        self.sender_entry = tk.Entry(
+        self.sender_entry = ttk.Combobox(
             sender_frame,
             textvariable=self.sender_phone,
             font=("Consolas", 12),
-            relief=tk.SOLID,
-            borderwidth=1,
-            width=25
+            width=23,
+            values=self.saved_values.get_values('sender_phones')
         )
         self.sender_entry.pack(side=tk.LEFT, ipady=5)
+
+        # Кнопка для сохранения номера отправителя
+        save_sender_btn = tk.Button(
+            sender_frame,
+            text="+",
+            font=("Roboto", 14, "bold"),
+            bg=self.colors['primary'],
+            fg='white',
+            relief=tk.FLAT,
+            width=2,
+            cursor='hand2',
+            command=lambda: self.save_value('sender_phones', self.sender_phone.get())
+        )
+        save_sender_btn.pack(side=tk.LEFT, padx=(5, 10))
 
         self.sender_validation_label = tk.Label(
             sender_frame,
@@ -1220,15 +1405,28 @@ class IVRCallerApp:
         template_frame.pack(fill=tk.X, pady=(0, 5))
 
         self.sms_template = tk.StringVar()
-        self.sms_template_entry = tk.Entry(
+        self.sms_template_entry = ttk.Combobox(
             template_frame,
             textvariable=self.sms_template,
             font=("Consolas", 12),
-            relief=tk.SOLID,
-            borderwidth=1,
-            width=25
+            width=23,
+            values=self.saved_values.get_values('sms_templates')
         )
         self.sms_template_entry.pack(side=tk.LEFT, ipady=5)
+
+        # Кнопка для сохранения номера шаблона
+        save_template_btn = tk.Button(
+            template_frame,
+            text="+",
+            font=("Roboto", 14, "bold"),
+            bg=self.colors['primary'],
+            fg='white',
+            relief=tk.FLAT,
+            width=2,
+            cursor='hand2',
+            command=lambda: self.save_value('sms_templates', self.sms_template.get())
+        )
+        save_template_btn.pack(side=tk.LEFT, padx=(5, 0))
 
         # Подсказка для шаблона СМС
         self.template_hint = tk.Label(
@@ -1396,6 +1594,57 @@ class IVRCallerApp:
 
         # Всё ок
         self.sender_validation_label.config(text="✅ OK", foreground="green")
+
+    def save_value(self, category, value):
+        """Сохранить значение (для номеров и шаблонов)"""
+        if self.saved_values.add_value(category, value):
+            # Обновляем список в соответствующем combobox
+            if category == 'sender_phones':
+                self.sender_entry['values'] = self.saved_values.get_values(category)
+                messagebox.showinfo("Успех", f"Номер '{value}' сохранен!")
+            elif category == 'sms_templates':
+                self.sms_template_entry['values'] = self.saved_values.get_values(category)
+                messagebox.showinfo("Успех", f"Шаблон '{value}' сохранен!")
+        else:
+            if not value.strip():
+                messagebox.showwarning("Внимание", "Значение не может быть пустым!")
+            else:
+                messagebox.showinfo("Информация", "Это значение уже сохранено!")
+
+    def save_text_value(self, category):
+        """Сохранить текстовое значение (для voice_text и sms_text)"""
+        if category == 'voice_texts':
+            text = self.voice_text.get("1.0", tk.END).strip()
+            widget_name = "озвучивания"
+            combo = self.voice_text_combo
+        elif category == 'sms_texts':
+            text = self.sms_text.get("1.0", tk.END).strip()
+            widget_name = "СМС"
+            combo = self.sms_text_combo
+        else:
+            return
+
+        if self.saved_values.add_value(category, text):
+            combo['values'] = self.saved_values.get_values(category)
+            messagebox.showinfo("Успех", f"Текст {widget_name} сохранен!")
+        else:
+            if not text:
+                messagebox.showwarning("Внимание", "Текст не может быть пустым!")
+            else:
+                messagebox.showinfo("Информация", "Этот текст уже сохранен!")
+
+    def load_text_value(self, category):
+        """Загрузить текстовое значение из combobox в Text widget"""
+        if category == 'voice_texts':
+            selected = self.voice_text_combo.get()
+            if selected:
+                self.voice_text.delete("1.0", tk.END)
+                self.voice_text.insert("1.0", selected)
+        elif category == 'sms_texts':
+            selected = self.sms_text_combo.get()
+            if selected:
+                self.sms_text.delete("1.0", tk.END)
+                self.sms_text.insert("1.0", selected)
 
     def toggle_delayed_send(self):
         """Включение/выключение полей даты и времени"""
@@ -1974,16 +2223,10 @@ class IVRCallerApp:
             )
             return
 
-        # Извлекаем номера телефонов
+        # Извлекаем номера телефонов с CONNID
         phones_data = campaign.get('phones_data', [])
         if not phones_data:
             messagebox.showwarning("Внимание", "В кампании нет номеров телефонов")
-            return
-
-        phone_numbers = [phone.get('number', '') for phone in phones_data if phone.get('number')]
-
-        if not phone_numbers:
-            messagebox.showwarning("Внимание", "Не удалось извлечь номера телефонов")
             return
 
         # Показываем окно ожидания
@@ -2002,7 +2245,7 @@ class IVRCallerApp:
 
         tk.Label(
             progress_window,
-            text=f"Проверка {len(phone_numbers)} номеров",
+            text=f"Проверка {len(phones_data)} номеров",
             font=("Roboto", 10),
             fg='gray'
         ).pack()
@@ -2010,8 +2253,8 @@ class IVRCallerApp:
         progress_window.update()
 
         try:
-            # Проверяем доставку
-            result = self.log_server.check_campaign_delivery(phone_numbers)
+            # Проверяем доставку (передаем phones_data с CONNID)
+            result = self.log_server.check_campaign_delivery(phones_data)
 
             progress_window.destroy()
 
@@ -2108,21 +2351,23 @@ class IVRCallerApp:
         details = result.get('details', {})
 
         for i, (phone, info) in enumerate(details.items(), 1):
-            status = "✓ ДОСТАВЛЕНО" if info['delivered'] else "✗ НЕ ДОСТАВЛЕНО"
-            status_color = "green" if info['delivered'] else "red"
-
             details_content += f"\n{'-' * 70}\n"
-            details_content += f"{i}. {phone} - {status}\n"
+            details_content += f"{i}. Номер: {phone}\n"
             details_content += f"{'-' * 70}\n"
 
-            if info['count'] > 0:
-                details_content += f"Записей в логах: {info['count']}\n"
-                if info['entries']:
-                    details_content += "\nПримеры записей из лога:\n"
-                    for entry in info['entries'][:3]:  # Показываем до 3 записей
-                        details_content += f"  • {entry}\n"
+            if info['count'] > 0 and info['entries']:
+                # Есть данные - показываем ВСЕ записи
+                for idx, entry in enumerate(info['entries'], 1):
+                    if len(info['entries']) > 1:
+                        details_content += f"\nЗапись #{idx}:\n"
+                    start_time = entry.get('START_CALL_TIME', 'нет данных')
+                    calling_list = entry.get('GSW_CALLING_LIST', 'нет данных')
+                    details_content += f"  START_CALL_TIME: {start_time}\n"
+                    details_content += f"  GSW_CALLING_LIST: {calling_list}\n"
             else:
-                details_content += "Записи в логах не найдены\n"
+                # Нет данных - CONNID не найден
+                details_content += "  START_CALL_TIME: Нет данных\n"
+                details_content += "  GSW_CALLING_LIST: Нет данных\n"
 
             details_content += "\n"
 
@@ -2596,12 +2841,14 @@ class IVRCallerApp:
             request_info = {
                 "url": self.config.api_url,
                 "status": "success" if request_result else "failed",
-                "request_json": request_data  # Полный JSON запроса
+                "request_json": request_data,  # Полный JSON запроса
+                "connid": request_data.get('CONNID', '')  # Сохраняем CONNID отдельно для проверки
             }
 
             # Обновляем phone_data с информацией о запросе
             if campaign_extra and 'phones_data' in campaign_extra and i < len(campaign_extra['phones_data']):
                 campaign_extra['phones_data'][i]['request_info'] = request_info
+                campaign_extra['phones_data'][i]['connid'] = request_data.get('CONNID', '')  # Для быстрого доступа
 
             if request_result:
                 success += 1
