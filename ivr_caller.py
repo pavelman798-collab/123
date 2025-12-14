@@ -990,15 +990,10 @@ class IVRCallerApp:
         # Загрузчик данных
         self.data_loader = DataLoader(self.config)
 
-        # Загрузка сотрудников
-        self.employees = self.data_loader.load_employees()
-        self.data_source = self.data_loader.source_used
-
         # CONNID
         self.current_connid = self._load_connid()
 
         # UI переменные
-        self.employee_vars = {}
         self.selected_alert_type = tk.StringVar(value="call")
 
         self.setup_ui()
@@ -1126,36 +1121,6 @@ class IVRCallerApp:
             command=self.toggle_theme
         )
         theme_btn.pack()
-
-        # Информационная панель
-        info_frame = tk.Frame(self.root, bg=self.colors['bg'])
-        info_frame.pack(fill=tk.X, padx=20, pady=(15, 10))
-
-        source_icon = "✓" if self.data_source != "Тестовые данные" else "⚠"
-        info_label = tk.Label(
-            info_frame,
-            text=f"{source_icon} Источник: {self.data_source}  •  Сотрудников: {len(self.employees)}",
-            font=("Roboto", 10),
-            bg=self.colors['bg'],
-            fg=self.colors['text_muted']
-        )
-        info_label.pack(side=tk.LEFT)
-
-        refresh_btn = tk.Button(
-            info_frame,
-            text="↻ Обновить",
-            font=("Roboto", 10),
-            bg=self.colors['primary'],
-            fg="white",
-            activebackground=self.colors['primary_hover'],
-            activeforeground="white",
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=15,
-            pady=6,
-            command=self.refresh_employees
-        )
-        refresh_btn.pack(side=tk.RIGHT)
 
         # Вкладки
         self.notebook = ttk.Notebook(self.root)
@@ -1316,12 +1281,13 @@ class IVRCallerApp:
         tk.Button(
             btn_frame,
             text="📥 Пример",
-            font=("Roboto", 11),
-            bg=self.colors['secondary'],
-            fg=self.colors['fg'],
-            activebackground=self.colors['border'],
-            activeforeground=self.colors['fg'],
-            relief=tk.FLAT,
+            font=("Roboto", 11, "bold"),
+            bg='#E0E0E0',
+            fg='#333333',
+            activebackground='#D0D0D0',
+            activeforeground='#333333',
+            relief=tk.SOLID,
+            borderwidth=1,
             cursor="hand2",
             padx=20,
             pady=10,
@@ -1331,12 +1297,13 @@ class IVRCallerApp:
         tk.Button(
             btn_frame,
             text="🗑️ Очистить",
-            font=("Roboto", 11),
-            bg=self.colors['secondary'],
-            fg=self.colors['fg'],
-            activebackground=self.colors['border'],
-            activeforeground=self.colors['fg'],
-            relief=tk.FLAT,
+            font=("Roboto", 11, "bold"),
+            bg='#E0E0E0',
+            fg='#333333',
+            activebackground='#D0D0D0',
+            activeforeground='#333333',
+            relief=tk.SOLID,
+            borderwidth=1,
             cursor="hand2",
             padx=20,
             pady=10,
@@ -1535,7 +1502,7 @@ class IVRCallerApp:
 
         send_btn = tk.Button(
             bottom_container,
-            text="🚀 Отправить оповещения",
+            text="Отправить оповещения",
             font=("Roboto", 14, "bold"),
             bg=self.colors['primary'],
             fg="white",
@@ -1721,7 +1688,7 @@ class IVRCallerApp:
 
         tk.Button(
             btn_frame,
-            text="📄 Экспорт запросов",
+            text="Экспорт запросов",
             font=("Roboto", 10, "bold"),
             bg=self.colors['primary'],
             fg="white",
@@ -1736,7 +1703,7 @@ class IVRCallerApp:
 
         tk.Button(
             btn_frame,
-            text="🗑️ Удалить из очереди",
+            text="Удалить из очереди",
             font=("Roboto", 10, "bold"),
             bg=self.colors['primary'],
             fg="white",
@@ -1834,7 +1801,7 @@ class IVRCallerApp:
 
         tk.Button(
             btn_frame,
-            text="📄 Экспорт запросов",
+            text="Экспорт запросов",
             font=("Roboto", 10, "bold"),
             bg=self.colors['primary'],
             fg="white",
@@ -2386,47 +2353,6 @@ class IVRCallerApp:
             )
         except Exception as e:
             messagebox.showerror("Ошибка", f"Ошибка при создании файла:\n{e}")
-
-    def refresh_employees(self):
-        # Создаём окно с логом
-        log_window = tk.Toplevel(self.root)
-        log_window.title("🔄 Загрузка данных...")
-        log_window.geometry("700x500")
-        log_window.transient(self.root)
-
-        # Текстовое поле для лога
-        log_text = tk.Text(log_window, wrap=tk.WORD, font=("Consolas", 9))
-        scrollbar = ttk.Scrollbar(log_window, orient=tk.VERTICAL, command=log_text.yview)
-        log_text.configure(yscrollcommand=scrollbar.set)
-
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-        # Кнопка закрытия
-        ttk.Button(log_window, text="Закрыть", command=log_window.destroy).pack(pady=5)
-
-        log_window.update()
-
-        # Загружаем данные
-        self.data_loader = DataLoader(self.config)
-        self.employees = self.data_loader.load_employees()
-        self.data_source = self.data_loader.source_used
-
-        # Показываем лог PHP если использовался
-        if hasattr(self.data_loader.php, 'debug_log'):
-            for line in self.data_loader.php.debug_log:
-                log_text.insert(tk.END, line + "\n")
-                log_text.see(tk.END)
-                log_window.update()
-
-        log_text.insert(tk.END, "\n" + "=" * 50 + "\n")
-        log_text.insert(tk.END, f"✅ Источник: {self.data_source}\n")
-        log_text.insert(tk.END, f"✅ Загружено: {len(self.employees)} сотрудников\n")
-
-        # Обновляем UI
-        self.employee_vars.clear()
-        self.populate_employees_list()
-
 
     def send_constructor_alerts(self):
         # Проверка загруженных номеров
