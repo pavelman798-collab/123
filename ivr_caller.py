@@ -2127,24 +2127,23 @@ class IVRCallerApp:
         details = result.get('details', {})
 
         for i, (phone, info) in enumerate(details.items(), 1):
-            status = "✓ ДОСТАВЛЕНО" if info['delivered'] else "✗ НЕ ДОСТАВЛЕНО"
-            status_color = "green" if info['delivered'] else "red"
-
             details_content += f"\n{'-' * 70}\n"
-            details_content += f"{i}. {phone} - {status}\n"
+            details_content += f"{i}. Номер: {phone}\n"
             details_content += f"{'-' * 70}\n"
 
-            if info['count'] > 0:
-                details_content += f"Записей в логах: {info['count']}\n\n"
-                details_content += "Записи из fm2.log:\n"
-                for idx, entry in enumerate(info['entries'], 1):  # ВСЕ записи
-                    details_content += f"  Запись #{idx}:\n"
+            if info['count'] > 0 and info['entries']:
+                # Есть данные - показываем ВСЕ записи
+                for idx, entry in enumerate(info['entries'], 1):
+                    if len(info['entries']) > 1:
+                        details_content += f"\nЗапись #{idx}:\n"
                     start_time = entry.get('START_CALL_TIME', 'нет данных')
                     calling_list = entry.get('GSW_CALLING_LIST', 'нет данных')
-                    details_content += f"    START_CALL_TIME: {start_time}\n"
-                    details_content += f"    GSW_CALLING_LIST: {calling_list}\n"
+                    details_content += f"  START_CALL_TIME: {start_time}\n"
+                    details_content += f"  GSW_CALLING_LIST: {calling_list}\n"
             else:
-                details_content += "Нет данных (CONNID не найден в логах)\n"
+                # Нет данных - CONNID не найден
+                details_content += "  START_CALL_TIME: Нет данных\n"
+                details_content += "  GSW_CALLING_LIST: Нет данных\n"
 
             details_content += "\n"
 
