@@ -502,7 +502,7 @@ class LogServerConnector:
             return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
     def check_campaign_delivery(self, phones_data):
-        """Проверка доставки с проверкой CONNID (оптимизированная с батчингом)
+        """Проверка доставки ТОЛЬКО по CONNID
 
         Args:
             phones_data: list of dicts with 'number' and 'connid'
@@ -510,13 +510,12 @@ class LogServerConnector:
         Returns:
             dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
         """
-        BATCH_SIZE = 50  # Максимум номеров в одном запросе
+        BATCH_SIZE = 50
 
         if self.debug_logger:
-            self.debug_logger.info("Начало проверки доставки с проверкой CONNID", {
+            self.debug_logger.info("Начало проверки доставки ТОЛЬКО по CONNID", {
                 "total_phones": len(phones_data),
-                "batch_size": BATCH_SIZE,
-                "batches_count": (len(phones_data) + BATCH_SIZE - 1) // BATCH_SIZE
+                "batch_size": BATCH_SIZE
             })
 
         results = {
@@ -542,95 +541,95 @@ class LogServerConnector:
             params = self.get_connection_params()
             log_path = os.path.join(params['log_dir'], params['log_file'])
 
-            # Создаем словари: телефон -> CONNID и clean_phone -> оригинальный номер
-            phone_to_connid = {}
-            clean_phones = {}
+            # Создаем словарь CONNID -> телефон
+            connid_to_phone = {}
+            connid_list = []
+
             for phone_info in phones_data:
                 phone = phone_info.get('number', '')
                 connid = phone_info.get('connid', '')
-                if phone:
-                    clean_phone = phone.replace('+', '').replace('-', '').replace(' ', '')
-                    phone_to_connid[phone] = connid
-                    clean_phones[clean_phone] = phone
+                if connid:  # Только если есть CONNID
+                    connid_to_phone[connid] = phone
+                    connid_list.append(connid)
 
-            # Разбиваем на батчи
-            phone_list = list(clean_phones.keys())
-            found_phones = {}
+            if not connid_list:
+                if self.debug_logger:
+                    self.debug_logger.error("Нет CONNID для проверки", {})
+                return results
 
-            for batch_idx in range(0, len(phone_list), BATCH_SIZE):
-                batch = phone_list[batch_idx:batch_idx + BATCH_SIZE]
+            # Разбиваем CONNID на батчи
+            found_data = {}  # CONNID -> список записей
+
+            for batch_idx in range(0, len(connid_list), BATCH_SIZE):
+                batch = connid_list[batch_idx:batch_idx + BATCH_SIZE]
                 batch_num = (batch_idx // BATCH_SIZE) + 1
-                total_batches = (len(phone_list) + BATCH_SIZE - 1) // BATCH_SIZE
+                total_batches = (len(connid_list) + BATCH_SIZE - 1) // BATCH_SIZE
 
-                # Формируем команду grep для батча
+                # Ищем по CONNID, а НЕ по номеру телефона!
                 pattern = '|'.join(batch)
                 command = f"grep -E '{pattern}' {log_path}"
 
                 if self.debug_logger:
-                    self.debug_logger.info(f"Выполнение батча {batch_num}/{total_batches}", {
+                    self.debug_logger.info(f"Поиск по CONNID батч {batch_num}/{total_batches}", {
                         "command_length": len(command),
-                        "phones_in_batch": len(batch)
+                        "connids_in_batch": len(batch)
                     })
 
-                # Выполняем grep
                 stdin, stdout, stderr = self.client.exec_command(command)
                 output = stdout.read().decode('utf-8')
 
-                # Парсим результаты батча с проверкой CONNID
+                # Парсим результаты - извлекаем ТОЛЬКО START_CALL_TIME и GSW_CALLING_LIST
                 if output:
                     lines = output.strip().split('\n')
                     for line in lines:
                         if not line.strip():
                             continue
 
-                        # Проверяем какой номер и CONNID в строке
-                        for clean_phone in batch:
-                            if clean_phone in line:
-                                original_phone = clean_phones[clean_phone]
-                                expected_connid = phone_to_connid.get(original_phone, '')
+                        # Определяем какому CONNID принадлежит запись
+                        for connid in batch:
+                            if connid in line:
+                                # Извлекаем поля
+                                log_entry = {}
 
-                                # Проверяем CONNID в логе
-                                if expected_connid and expected_connid in line:
-                                    # Парсим JSON из лога
-                                    try:
-                                        # Извлекаем только START_CALL_TIME и GSW_CALLING_LIST
-                                        log_data = {}
-                                        if 'START_CALL_TIME' in line:
-                                            # Простой парсинг через поиск подстроки
-                                            start_idx = line.find('"START_CALL_TIME":"')
-                                            if start_idx != -1:
-                                                start_idx += len('"START_CALL_TIME":"')
-                                                end_idx = line.find('"', start_idx)
-                                                if end_idx != -1:
-                                                    log_data['START_CALL_TIME'] = line[start_idx:end_idx]
+                                # START_CALL_TIME
+                                if 'START_CALL_TIME' in line:
+                                    start_idx = line.find('"START_CALL_TIME":"')
+                                    if start_idx != -1:
+                                        start_idx += len('"START_CALL_TIME":"')
+                                        end_idx = line.find('"', start_idx)
+                                        if end_idx != -1:
+                                            log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
 
-                                        if 'GSW_CALLING_LIST' in line:
-                                            start_idx = line.find('"GSW_CALLING_LIST":"')
-                                            if start_idx != -1:
-                                                start_idx += len('"GSW_CALLING_LIST":"')
-                                                end_idx = line.find('"', start_idx)
-                                                if end_idx != -1:
-                                                    log_data['GSW_CALLING_LIST'] = line[start_idx:end_idx]
+                                # GSW_CALLING_LIST
+                                if 'GSW_CALLING_LIST' in line:
+                                    start_idx = line.find('"GSW_CALLING_LIST":"')
+                                    if start_idx != -1:
+                                        start_idx += len('"GSW_CALLING_LIST":"')
+                                        end_idx = line.find('"', start_idx)
+                                        if end_idx != -1:
+                                            log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
 
-                                        log_data['CONNID'] = expected_connid
+                                # Добавляем запись (ВСЕ записи, не только 3!)
+                                if connid not in found_data:
+                                    found_data[connid] = []
+                                found_data[connid].append(log_entry)
+                                break  # Нашли CONNID, переходим к следующей строке
 
-                                        if original_phone not in found_phones:
-                                            found_phones[original_phone] = []
-                                        found_phones[original_phone].append(log_data)
-                                    except:
-                                        pass
-
-            # Формируем результаты
+            # Формируем результаты для каждого телефона
             for phone_info in phones_data:
                 phone = phone_info.get('number', '')
-                if phone in found_phones:
+                connid = phone_info.get('connid', '')
+
+                if connid and connid in found_data:
+                    # Найдены записи для этого CONNID
                     results['delivered'] += 1
                     results['details'][phone] = {
                         'delivered': True,
-                        'count': len(found_phones[phone]),
-                        'entries': found_phones[phone][:3]  # Только первые 3 записи
+                        'count': len(found_data[connid]),
+                        'entries': found_data[connid]  # ВСЕ записи
                     }
                 else:
+                    # Не найдено
                     results['failed'] += 1
                     results['details'][phone] = {
                         'delivered': False,
@@ -2136,13 +2135,16 @@ class IVRCallerApp:
             details_content += f"{'-' * 70}\n"
 
             if info['count'] > 0:
-                details_content += f"Записей в логах: {info['count']}\n"
-                if info['entries']:
-                    details_content += "\nПримеры записей из лога:\n"
-                    for entry in info['entries'][:3]:  # Показываем до 3 записей
-                        details_content += f"  • {entry}\n"
+                details_content += f"Записей в логах: {info['count']}\n\n"
+                details_content += "Записи из fm2.log:\n"
+                for idx, entry in enumerate(info['entries'], 1):  # ВСЕ записи
+                    details_content += f"  Запись #{idx}:\n"
+                    start_time = entry.get('START_CALL_TIME', 'нет данных')
+                    calling_list = entry.get('GSW_CALLING_LIST', 'нет данных')
+                    details_content += f"    START_CALL_TIME: {start_time}\n"
+                    details_content += f"    GSW_CALLING_LIST: {calling_list}\n"
             else:
-                details_content += "Записи в логах не найдены\n"
+                details_content += "Нет данных (CONNID не найден в логах)\n"
 
             details_content += "\n"
 
