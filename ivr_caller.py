@@ -2696,7 +2696,35 @@ class IVRCallerApp:
                 "ADD_PROP": json.dumps(add_prop, ensure_ascii=False)
             }
 
-            json_data = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            # Кодируем в JSON с сохранением UTF-8 символов
+            json_string = json.dumps(data, ensure_ascii=False)
+            json_data = json_string.encode("utf-8")
+
+            # Проверка и логирование кодировки UTF-8
+            try:
+                # Проверяем что можно декодировать обратно
+                decoded_test = json_data.decode("utf-8")
+                is_valid_utf8 = True
+
+                # Логируем детали кодировки
+                self.debug_logger.info("Проверка кодировки запроса UTF-8", {
+                    "phone": phone,
+                    "json_string_length": len(json_string),
+                    "json_bytes_length": len(json_data),
+                    "is_valid_utf8": is_valid_utf8,
+                    "encoding": "utf-8",
+                    "first_50_chars": json_string[:50],
+                    "first_50_bytes": str(json_data[:50]),
+                    "voice_text_sample": voice_text[:30] if voice_text else "",
+                    "sms_text_sample": sms_text[:30] if sms_text else "",
+                    "contains_cyrillic": any(ord(c) > 127 for c in json_string)
+                })
+            except UnicodeDecodeError as e:
+                self.debug_logger.error("Ошибка кодировки UTF-8!", {
+                    "phone": phone,
+                    "error": str(e),
+                    "json_bytes": str(json_data[:100])
+                })
 
             # DEBUG: Логируем запрос перед отправкой
             self.debug_logger.debug(f"Отправка запроса на номер {phone}", {
@@ -2704,7 +2732,8 @@ class IVRCallerApp:
                 "alert_type": alert_type_key,
                 "service": service,
                 "url": self.config.api_url,
-                "request_data": data
+                "request_data": data,
+                "request_size_bytes": len(json_data)
             })
 
             request = urllib.request.Request(
@@ -2719,11 +2748,33 @@ class IVRCallerApp:
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
 
-            with urllib.request.urlopen(request, context=ssl_context, timeout=self.config.api_timeout):
-                pass
+            with urllib.request.urlopen(request, context=ssl_context, timeout=self.config.api_timeout) as response:
+                # Читаем ответ сервера
+                response_code = response.getcode()
+                response_headers = dict(response.headers)
+                response_body = response.read()
+
+                # Пытаемся декодировать ответ
+                try:
+                    response_text = response_body.decode('utf-8')
+                except:
+                    response_text = str(response_body)
+
+                # Логируем ответ сервера
+                self.debug_logger.info("Ответ от API сервера", {
+                    "phone": phone,
+                    "connid": connid,
+                    "response_code": response_code,
+                    "response_headers": response_headers,
+                    "response_body": response_text[:500],  # Первые 500 символов
+                    "response_length": len(response_body)
+                })
 
             # DEBUG: Успешная отправка
-            self.debug_logger.info(f"✅ Успешная отправка на {phone}", {"connid": connid})
+            self.debug_logger.info(f"✅ Успешная отправка на {phone}", {
+                "connid": connid,
+                "http_code": response_code
+            })
 
             self.current_connid += 1
             self._save_connid()
