@@ -470,7 +470,7 @@ class LogServerConnector:
             return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
     def check_campaign_delivery(self, phone_numbers):
-        """Проверка доставки для списка номеров
+        """Проверка доставки для списка номеров (оптимизированная версия)
 
         Args:
             phone_numbers: list of phone numbers
@@ -479,9 +479,9 @@ class LogServerConnector:
             dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
         """
         if self.debug_logger:
-            self.debug_logger.info("Начало проверки доставки кампании", {
+            self.debug_logger.info("Начало проверки доставки кампании (оптимизированная)", {
                 "total_phones": len(phone_numbers),
-                "phones_preview": phone_numbers[:5]  # Первые 5 номеров
+                "phones_preview": phone_numbers[:5]
             })
 
         results = {
@@ -493,24 +493,72 @@ class LogServerConnector:
         }
 
         try:
-            for i, phone in enumerate(phone_numbers, 1):
-                if self.debug_logger:
-                    self.debug_logger.info(f"Проверка номера {i}/{len(phone_numbers)}", {"phone": phone})
+            if not self.connected:
+                if not self.connect():
+                    return {
+                        'success': False,
+                        'error': 'Не удалось подключиться к лог-серверу',
+                        'total': len(phone_numbers),
+                        'delivered': 0,
+                        'failed': len(phone_numbers),
+                        'details': {}
+                    }
 
-                search_result = self.search_phone_in_logs(phone)
+            params = self.get_connection_params()
+            log_path = os.path.join(params['log_dir'], params['log_file'])
 
-                if search_result['success'] and search_result['count'] > 0:
+            # Очищаем все номера от спецсимволов
+            clean_phones = {}
+            for phone in phone_numbers:
+                clean_phone = phone.replace('+', '').replace('-', '').replace(' ', '')
+                clean_phones[clean_phone] = phone
+
+            # Формируем одну команду grep для всех номеров через | (OR)
+            pattern = '|'.join(clean_phones.keys())
+            command = f"grep -E '{pattern}' {log_path}"
+
+            if self.debug_logger:
+                self.debug_logger.info("Выполнение оптимизированного поиска (все номера в одном запросе)", {
+                    "command": command,
+                    "phones_count": len(phone_numbers),
+                    "log_path": log_path
+                })
+
+            # Выполняем один grep для всех номеров
+            stdin, stdout, stderr = self.client.exec_command(command)
+            output = stdout.read().decode('utf-8')
+            error = stderr.read().decode('utf-8')
+
+            if self.debug_logger:
+                self.debug_logger.info("Результат оптимизированного поиска", {
+                    "output_length": len(output),
+                    "output_lines": len(output.strip().split('\n')) if output else 0,
+                    "error": error if error else "нет ошибок"
+                })
+
+            # Парсим результаты - подсчитываем вхождения каждого номера
+            found_phones = {}
+            if output:
+                lines = output.strip().split('\n')
+                for line in lines:
+                    if not line.strip():
+                        continue
+                    # Проверяем какой номер содержится в этой строке
+                    for clean_phone, original_phone in clean_phones.items():
+                        if clean_phone in line:
+                            if original_phone not in found_phones:
+                                found_phones[original_phone] = []
+                            found_phones[original_phone].append(line)
+
+            # Формируем результаты для каждого номера
+            for phone in phone_numbers:
+                if phone in found_phones:
                     results['delivered'] += 1
                     results['details'][phone] = {
                         'delivered': True,
-                        'count': search_result['count'],
-                        'entries': search_result.get('entries', [])
+                        'count': len(found_phones[phone]),
+                        'entries': found_phones[phone][:3]  # Возвращаем только первые 3 записи
                     }
-                    if self.debug_logger:
-                        self.debug_logger.info(f"Номер найден в логах", {
-                            "phone": phone,
-                            "entries_count": search_result['count']
-                        })
                 else:
                     results['failed'] += 1
                     results['details'][phone] = {
@@ -518,19 +566,14 @@ class LogServerConnector:
                         'count': 0,
                         'entries': []
                     }
-                    if self.debug_logger:
-                        error = search_result.get('error', 'Не найдено в логах')
-                        self.debug_logger.info(f"Номер НЕ найден в логах", {
-                            "phone": phone,
-                            "reason": error
-                        })
 
             if self.debug_logger:
-                self.debug_logger.info("Проверка доставки завершена", {
+                self.debug_logger.info("Проверка доставки завершена (оптимизированная)", {
                     "total": results['total'],
                     "delivered": results['delivered'],
                     "failed": results['failed'],
-                    "delivery_rate": f"{(results['delivered'] / results['total'] * 100):.1f}%" if results['total'] > 0 else "0%"
+                    "delivery_rate": f"{(results['delivered'] / results['total'] * 100):.1f}%" if results['total'] > 0 else "0%",
+                    "speed": "одинзапрос вместо " + str(len(phone_numbers))
                 })
 
             return results
@@ -541,7 +584,6 @@ class LogServerConnector:
                 self.debug_logger.error("Критическая ошибка при проверке доставки", {
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "processed_phones": len(results['details']),
                     "total_phones": len(phone_numbers)
                 })
             return {
@@ -2835,7 +2877,12 @@ class IVRCallerApp:
         return queued_count, completed_count, total_sent
 
     def on_closing(self):
-        self.data_loader.disconnect()
+        """Обработчик закрытия приложения"""
+        # Отключаемся от лог-сервера если подключены
+        if self.log_server and self.log_server.connected:
+            self.log_server.disconnect()
+
+        # Закрываем окно
         self.root.destroy()
 
 
