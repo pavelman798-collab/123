@@ -42,6 +42,7 @@ CONNID_FILE = os.path.join(BASE_DIR, "connid.txt")
 LOG_FILE = os.path.join(BASE_DIR, "ivr_log.txt")
 DEBUG_LOG_FILE = os.path.join(BASE_DIR, "debug.log")
 HISTORY_FILE = os.path.join(BASE_DIR, "campaigns_history.json")
+SAVED_VALUES_FILE = os.path.join(BASE_DIR, "saved_values.json")
 THEME_FILE = os.path.join(BASE_DIR, "theme.txt")
 # ===========================================
 
@@ -284,6 +285,71 @@ class Config:
         self.config.set('auth', key, value)
         with open(self.config_path, 'w', encoding='utf-8') as f:
             self.config.write(f)
+
+
+class SavedValues:
+    """Класс для хранения сохраненных значений (номера, шаблоны, тексты) в JSON"""
+
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.data = {
+            'sender_phones': [],
+            'sms_templates': [],
+            'voice_texts': [],
+            'sms_texts': []
+        }
+        self.load()
+
+    def load(self):
+        """Загрузить сохраненные значения из файла"""
+        if os.path.exists(self.file_path):
+            try:
+                with open(self.file_path, 'r', encoding='utf-8') as f:
+                    loaded_data = json.load(f)
+                    # Обновляем только существующие категории
+                    for key in self.data.keys():
+                        if key in loaded_data:
+                            self.data[key] = loaded_data[key]
+            except Exception as e:
+                print(f"⚠️ Ошибка загрузки сохраненных значений: {e}")
+
+    def save(self):
+        """Сохранить значения в файл"""
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                json.dump(self.data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"⚠️ Ошибка сохранения значений: {e}")
+
+    def add_value(self, category, value):
+        """Добавить значение в категорию"""
+        if category not in self.data:
+            return False
+
+        # Убираем пробелы по краям
+        value = str(value).strip()
+
+        # Не добавляем пустые значения
+        if not value:
+            return False
+
+        # Не добавляем дубликаты
+        if value in self.data[category]:
+            return False
+
+        # Добавляем в начало списка (последние использованные - первые)
+        self.data[category].insert(0, value)
+
+        # Ограничиваем размер списка (максимум 50 значений)
+        if len(self.data[category]) > 50:
+            self.data[category] = self.data[category][:50]
+
+        self.save()
+        return True
+
+    def get_values(self, category):
+        """Получить список значений для категории"""
+        return self.data.get(category, [])
 
 
 class LogServerConnector:
@@ -830,6 +896,9 @@ class IVRCallerApp:
         # Создаем секцию log_server в конфиге, если её нет
         self.log_server.get_connection_params()
 
+        # Сохраненные значения
+        self.saved_values = SavedValues(SAVED_VALUES_FILE)
+
         # CONNID
         self.current_connid = self._load_connid()
 
@@ -1055,13 +1124,30 @@ class IVRCallerApp:
         text_card = self.create_card(frame_inner, title="✉ Содержимое сообщений", pady=15)
 
         # Поле для озвучивания
+        voice_label_frame = tk.Frame(text_card, bg=self.colors['card_bg'])
+        voice_label_frame.pack(fill=tk.X, pady=(5, 8))
+
         tk.Label(
-            text_card,
+            voice_label_frame,
             text="📞 Текст для озвучивания при звонке",
             font=("Roboto", 12, "bold"),
             bg=self.colors['card_bg'],
             fg=self.colors['fg']
-        ).pack(anchor=tk.W, pady=(5, 8))
+        ).pack(side=tk.LEFT)
+
+        # Кнопка для сохранения текста озвучивания
+        save_voice_btn = tk.Button(
+            voice_label_frame,
+            text="+",
+            font=("Roboto", 12, "bold"),
+            bg=self.colors['primary'],
+            fg='white',
+            relief=tk.FLAT,
+            width=2,
+            cursor='hand2',
+            command=lambda: self.save_text_value('voice_texts')
+        )
+        save_voice_btn.pack(side=tk.LEFT, padx=(10, 0))
 
         self.voice_text = tk.Text(
             text_card,
@@ -1073,16 +1159,55 @@ class IVRCallerApp:
             padx=10,
             pady=8
         )
-        self.voice_text.pack(fill=tk.X, pady=(0, 20))
+        self.voice_text.pack(fill=tk.X, pady=(0, 5))
+
+        # Combobox для выбора сохраненного текста озвучивания
+        voice_history_frame = tk.Frame(text_card, bg=self.colors['card_bg'])
+        voice_history_frame.pack(fill=tk.X, pady=(0, 20))
+
+        tk.Label(
+            voice_history_frame,
+            text="📋 Сохраненные тексты:",
+            font=("Roboto", 9),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text_muted']
+        ).pack(side=tk.LEFT, padx=(0, 5))
+
+        self.voice_text_combo = ttk.Combobox(
+            voice_history_frame,
+            font=("Roboto", 9),
+            width=40,
+            values=self.saved_values.get_values('voice_texts'),
+            state='readonly'
+        )
+        self.voice_text_combo.pack(side=tk.LEFT)
+        self.voice_text_combo.bind('<<ComboboxSelected>>', lambda e: self.load_text_value('voice_texts'))
 
         # Поле для СМС
+        sms_label_frame = tk.Frame(text_card, bg=self.colors['card_bg'])
+        sms_label_frame.pack(fill=tk.X, pady=(5, 8))
+
         tk.Label(
-            text_card,
+            sms_label_frame,
             text="📱 Текст для СМС",
             font=("Roboto", 12, "bold"),
             bg=self.colors['card_bg'],
             fg=self.colors['fg']
-        ).pack(anchor=tk.W, pady=(5, 8))
+        ).pack(side=tk.LEFT)
+
+        # Кнопка для сохранения текста СМС
+        save_sms_btn = tk.Button(
+            sms_label_frame,
+            text="+",
+            font=("Roboto", 12, "bold"),
+            bg=self.colors['primary'],
+            fg='white',
+            relief=tk.FLAT,
+            width=2,
+            cursor='hand2',
+            command=lambda: self.save_text_value('sms_texts')
+        )
+        save_sms_btn.pack(side=tk.LEFT, padx=(10, 0))
 
         self.sms_text = tk.Text(
             text_card,
@@ -1094,7 +1219,29 @@ class IVRCallerApp:
             padx=10,
             pady=8
         )
-        self.sms_text.pack(fill=tk.X)
+        self.sms_text.pack(fill=tk.X, pady=(0, 5))
+
+        # Combobox для выбора сохраненного текста СМС
+        sms_history_frame = tk.Frame(text_card, bg=self.colors['card_bg'])
+        sms_history_frame.pack(fill=tk.X, pady=(0, 0))
+
+        tk.Label(
+            sms_history_frame,
+            text="📋 Сохраненные тексты:",
+            font=("Roboto", 9),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text_muted']
+        ).pack(side=tk.LEFT, padx=(0, 5))
+
+        self.sms_text_combo = ttk.Combobox(
+            sms_history_frame,
+            font=("Roboto", 9),
+            width=40,
+            values=self.saved_values.get_values('sms_texts'),
+            state='readonly'
+        )
+        self.sms_text_combo.pack(side=tk.LEFT)
+        self.sms_text_combo.bind('<<ComboboxSelected>>', lambda e: self.load_text_value('sms_texts'))
 
         # === КАРТОЧКА 3: Загрузка номеров ===
         file_card = self.create_card(frame_inner, title="📂 Загрузка номеров телефонов", pady=15)
@@ -1202,15 +1349,28 @@ class IVRCallerApp:
         sender_frame.pack(fill=tk.X, pady=(0, 5))
 
         self.sender_phone = tk.StringVar()
-        self.sender_entry = tk.Entry(
+        self.sender_entry = ttk.Combobox(
             sender_frame,
             textvariable=self.sender_phone,
             font=("Consolas", 12),
-            relief=tk.SOLID,
-            borderwidth=1,
-            width=25
+            width=23,
+            values=self.saved_values.get_values('sender_phones')
         )
         self.sender_entry.pack(side=tk.LEFT, ipady=5)
+
+        # Кнопка для сохранения номера отправителя
+        save_sender_btn = tk.Button(
+            sender_frame,
+            text="+",
+            font=("Roboto", 14, "bold"),
+            bg=self.colors['primary'],
+            fg='white',
+            relief=tk.FLAT,
+            width=2,
+            cursor='hand2',
+            command=lambda: self.save_value('sender_phones', self.sender_phone.get())
+        )
+        save_sender_btn.pack(side=tk.LEFT, padx=(5, 10))
 
         self.sender_validation_label = tk.Label(
             sender_frame,
@@ -1245,15 +1405,28 @@ class IVRCallerApp:
         template_frame.pack(fill=tk.X, pady=(0, 5))
 
         self.sms_template = tk.StringVar()
-        self.sms_template_entry = tk.Entry(
+        self.sms_template_entry = ttk.Combobox(
             template_frame,
             textvariable=self.sms_template,
             font=("Consolas", 12),
-            relief=tk.SOLID,
-            borderwidth=1,
-            width=25
+            width=23,
+            values=self.saved_values.get_values('sms_templates')
         )
         self.sms_template_entry.pack(side=tk.LEFT, ipady=5)
+
+        # Кнопка для сохранения номера шаблона
+        save_template_btn = tk.Button(
+            template_frame,
+            text="+",
+            font=("Roboto", 14, "bold"),
+            bg=self.colors['primary'],
+            fg='white',
+            relief=tk.FLAT,
+            width=2,
+            cursor='hand2',
+            command=lambda: self.save_value('sms_templates', self.sms_template.get())
+        )
+        save_template_btn.pack(side=tk.LEFT, padx=(5, 0))
 
         # Подсказка для шаблона СМС
         self.template_hint = tk.Label(
@@ -1421,6 +1594,57 @@ class IVRCallerApp:
 
         # Всё ок
         self.sender_validation_label.config(text="✅ OK", foreground="green")
+
+    def save_value(self, category, value):
+        """Сохранить значение (для номеров и шаблонов)"""
+        if self.saved_values.add_value(category, value):
+            # Обновляем список в соответствующем combobox
+            if category == 'sender_phones':
+                self.sender_entry['values'] = self.saved_values.get_values(category)
+                messagebox.showinfo("Успех", f"Номер '{value}' сохранен!")
+            elif category == 'sms_templates':
+                self.sms_template_entry['values'] = self.saved_values.get_values(category)
+                messagebox.showinfo("Успех", f"Шаблон '{value}' сохранен!")
+        else:
+            if not value.strip():
+                messagebox.showwarning("Внимание", "Значение не может быть пустым!")
+            else:
+                messagebox.showinfo("Информация", "Это значение уже сохранено!")
+
+    def save_text_value(self, category):
+        """Сохранить текстовое значение (для voice_text и sms_text)"""
+        if category == 'voice_texts':
+            text = self.voice_text.get("1.0", tk.END).strip()
+            widget_name = "озвучивания"
+            combo = self.voice_text_combo
+        elif category == 'sms_texts':
+            text = self.sms_text.get("1.0", tk.END).strip()
+            widget_name = "СМС"
+            combo = self.sms_text_combo
+        else:
+            return
+
+        if self.saved_values.add_value(category, text):
+            combo['values'] = self.saved_values.get_values(category)
+            messagebox.showinfo("Успех", f"Текст {widget_name} сохранен!")
+        else:
+            if not text:
+                messagebox.showwarning("Внимание", "Текст не может быть пустым!")
+            else:
+                messagebox.showinfo("Информация", "Этот текст уже сохранен!")
+
+    def load_text_value(self, category):
+        """Загрузить текстовое значение из combobox в Text widget"""
+        if category == 'voice_texts':
+            selected = self.voice_text_combo.get()
+            if selected:
+                self.voice_text.delete("1.0", tk.END)
+                self.voice_text.insert("1.0", selected)
+        elif category == 'sms_texts':
+            selected = self.sms_text_combo.get()
+            if selected:
+                self.sms_text.delete("1.0", tk.END)
+                self.sms_text.insert("1.0", selected)
 
     def toggle_delayed_send(self):
         """Включение/выключение полей даты и времени"""
