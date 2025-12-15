@@ -2350,9 +2350,22 @@ class IVRCallerApp:
         details_content = ""
         details = result.get('details', {})
 
+        # Создаем словарь номер -> CONNID для быстрого поиска
+        phone_to_connid = {}
+        phones_data = campaign.get('phones_data', [])
+        for phone_info in phones_data:
+            phone_num = phone_info.get('number', '')
+            connid = phone_info.get('connid', '')
+            if phone_num:
+                phone_to_connid[phone_num] = connid
+
         for i, (phone, info) in enumerate(details.items(), 1):
             details_content += f"\n{'-' * 70}\n"
             details_content += f"{i}. Номер: {phone}\n"
+
+            # Показываем CONNID для отладки
+            connid = phone_to_connid.get(phone, 'не найден')
+            details_content += f"   CONNID: {connid}\n"
             details_content += f"{'-' * 70}\n"
 
             if info['count'] > 0 and info['entries']:
@@ -2368,15 +2381,40 @@ class IVRCallerApp:
                 # Нет данных - CONNID не найден
                 details_content += "  START_CALL_TIME: Нет данных\n"
                 details_content += "  GSW_CALLING_LIST: Нет данных\n"
+                if not connid or connid == 'не найден':
+                    details_content += "  ⚠️ ПРИЧИНА: CONNID отсутствует в данных кампании\n"
+                else:
+                    details_content += f"  ⚠️ ПРИЧИНА: CONNID '{connid}' не найден в логах на сервере\n"
 
             details_content += "\n"
 
         details_text.insert("1.0", details_content)
         details_text.config(state='disabled')
 
+        # Рамка для кнопок
+        btn_frame = ttk.Frame(results_window)
+        btn_frame.pack(pady=(0, 20))
+
+        # Кнопка повторной проверки доставки
+        recheck_btn = tk.Button(
+            btn_frame,
+            text="Проверить доставку повторно",
+            font=("Roboto", 11, "bold"),
+            bg=self.colors['primary'],
+            fg='white',
+            activebackground='#B8050E',
+            activeforeground='white',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=20,
+            pady=10,
+            command=lambda: self.recheck_delivery(results_window, campaign)
+        )
+        recheck_btn.pack(side=tk.LEFT, padx=5)
+
         # Кнопка закрытия
         close_btn = tk.Button(
-            results_window,
+            btn_frame,
             text="Закрыть",
             font=("Roboto", 11),
             bg='#E0E0E0',
@@ -2390,7 +2428,12 @@ class IVRCallerApp:
             pady=10,
             command=results_window.destroy
         )
-        close_btn.pack(pady=(0, 20))
+        close_btn.pack(side=tk.LEFT, padx=5)
+
+    def recheck_delivery(self, results_window, campaign):
+        """Повторная проверка доставки из окна результатов"""
+        results_window.destroy()  # Закрываем текущее окно результатов
+        self.check_campaign_delivery_ui(campaign)  # Запускаем проверку заново
 
     def refresh_queued_history(self):
         """Обновление отображения кампаний в очереди"""
