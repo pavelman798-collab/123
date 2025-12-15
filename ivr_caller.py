@@ -567,11 +567,13 @@ class LogServerConnector:
                 })
             return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
-    def check_campaign_delivery(self, phones_data):
+    def check_campaign_delivery(self, phones_data, progress_callback=None, cancelled_flag=None):
         """Проверка доставки ТОЛЬКО по CONNID
 
         Args:
             phones_data: list of dicts with 'number' and 'connid'
+            progress_callback: функция для обновления прогресса (current, total, message)
+            cancelled_flag: dict с ключом 'cancelled' для проверки отмены операции
 
         Returns:
             dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
@@ -593,7 +595,20 @@ class LogServerConnector:
         }
 
         try:
+            # Проверка отмены операции
+            if cancelled_flag and cancelled_flag.get('cancelled'):
+                return {
+                    'success': False,
+                    'error': 'Операция отменена пользователем',
+                    'total': len(phones_data),
+                    'delivered': 0,
+                    'failed': len(phones_data),
+                    'details': {}
+                }
+
             if not self.connected:
+                if progress_callback:
+                    progress_callback(0, 1, "Подключение к лог-серверу...")
                 if not self.connect():
                     return {
                         'success': False,
@@ -627,9 +642,26 @@ class LogServerConnector:
             found_data = {}  # CONNID -> список записей
 
             for batch_idx in range(0, len(connid_list), BATCH_SIZE):
+                # Проверка отмены операции
+                if cancelled_flag and cancelled_flag.get('cancelled'):
+                    if self.debug_logger:
+                        self.debug_logger.info("Операция прервана пользователем", {})
+                    return {
+                        'success': False,
+                        'error': 'Операция отменена пользователем',
+                        'total': len(phones_data),
+                        'delivered': results['delivered'],
+                        'failed': results['failed'],
+                        'details': results['details']
+                    }
+
                 batch = connid_list[batch_idx:batch_idx + BATCH_SIZE]
                 batch_num = (batch_idx // BATCH_SIZE) + 1
                 total_batches = (len(connid_list) + BATCH_SIZE - 1) // BATCH_SIZE
+
+                # Обновляем прогресс
+                if progress_callback:
+                    progress_callback(batch_num, total_batches, f"Обработка батча {batch_num} из {total_batches}...")
 
                 # Ищем по CONNID, а НЕ по номеру телефона!
                 pattern = '|'.join(batch)
@@ -2257,34 +2289,89 @@ class IVRCallerApp:
             messagebox.showwarning("Внимание", "В кампании нет номеров телефонов")
             return
 
-        # Показываем окно ожидания
+        # Показываем окно с прогресс-баром
         progress_window = tk.Toplevel(self.root)
         progress_window.title("Проверка доставки")
-        progress_window.geometry("400x150")
+        progress_window.geometry("450x180")
         progress_window.transient(self.root)
         progress_window.grab_set()
 
-        tk.Label(
+        # Заголовок
+        title_label = tk.Label(
             progress_window,
-            text="Подключение к лог-серверу...",
-            font=("Roboto", 12),
-            pady=20
-        ).pack()
+            text="Получение данных с лог-сервера...",
+            font=("Roboto", 12, "bold"),
+            pady=15
+        )
+        title_label.pack()
 
-        tk.Label(
+        # Сообщение о прогрессе
+        status_label = tk.Label(
             progress_window,
             text=f"Проверка {len(phones_data)} номеров",
             font=("Roboto", 10),
             fg='gray'
-        ).pack()
+        )
+        status_label.pack()
+
+        # Прогресс-бар
+        progress_bar = ttk.Progressbar(
+            progress_window,
+            length=350,
+            mode='determinate',
+            maximum=100
+        )
+        progress_bar.pack(pady=15)
+
+        # Флаг отмены операции
+        cancelled = {'cancelled': False}
+
+        # Кнопка отмены
+        def cancel_operation():
+            cancelled['cancelled'] = True
+            cancel_btn.config(state='disabled', text="Отмена...")
+
+        cancel_btn = tk.Button(
+            progress_window,
+            text="Отменить",
+            font=("Roboto", 10),
+            bg='#FF5252',
+            fg='white',
+            activebackground='#D32F2F',
+            activeforeground='white',
+            cursor="hand2",
+            padx=25,
+            pady=8,
+            command=cancel_operation
+        )
+        cancel_btn.pack()
 
         progress_window.update()
 
+        # Функция обновления прогресса
+        def update_progress(current, total, message):
+            if not progress_window.winfo_exists():
+                cancelled['cancelled'] = True
+                return
+            progress = (current / total * 100) if total > 0 else 0
+            progress_bar['value'] = progress
+            status_label.config(text=message)
+            progress_window.update()
+
         try:
-            # Проверяем доставку (передаем phones_data с CONNID)
-            result = self.log_server.check_campaign_delivery(phones_data)
+            # Проверяем доставку с прогрессом и возможностью отмены
+            result = self.log_server.check_campaign_delivery(
+                phones_data,
+                progress_callback=update_progress,
+                cancelled_flag=cancelled
+            )
 
             progress_window.destroy()
+
+            # Проверяем, была ли операция отменена
+            if cancelled.get('cancelled') and result.get('error') == 'Операция отменена пользователем':
+                messagebox.showinfo("Отменено", "Проверка доставки была отменена")
+                return
 
             if not result['success']:
                 messagebox.showerror("Ошибка", f"Ошибка при проверке доставки:\n{result.get('error', 'Неизвестная ошибка')}")
@@ -2294,7 +2381,8 @@ class IVRCallerApp:
             self.show_delivery_results(result, campaign)
 
         except Exception as e:
-            progress_window.destroy()
+            if progress_window.winfo_exists():
+                progress_window.destroy()
             messagebox.showerror("Ошибка", f"Ошибка при проверке доставки:\n{str(e)}")
 
     def show_delivery_results(self, result, campaign):
@@ -2949,11 +3037,14 @@ class IVRCallerApp:
         success, fail = 0, 0
         requests_log = []
 
+        # Флаг отмены операции
+        cancelled = {'cancelled': False}
+
         # Создаем прогресс-окно только если show_ui=True
         if show_ui:
             progress = tk.Toplevel(self.root)
             progress.title("Отправка...")
-            progress.geometry("400x160")
+            progress.geometry("400x200")
             progress.transient(self.root)
             progress.grab_set()
 
@@ -2963,18 +3054,45 @@ class IVRCallerApp:
             # Процентный индикатор
             percent_label = ttk.Label(progress, text="0%", font=("Segoe UI", 12, "bold"), foreground="#0066CC")
             percent_label.pack(pady=(0, 10))
+
+            # Прогресс-бар
+            bar = ttk.Progressbar(progress, length=350, maximum=len(employees), mode='determinate')
+            bar.pack(pady=10)
+
+            # Кнопка отмены
+            def cancel_send():
+                cancelled['cancelled'] = True
+                cancel_btn.config(state='disabled', text="Отмена...")
+
+            cancel_btn = tk.Button(
+                progress,
+                text="Остановить отправку",
+                font=("Roboto", 9),
+                bg='#FF5252',
+                fg='white',
+                activebackground='#D32F2F',
+                activeforeground='white',
+                cursor="hand2",
+                padx=20,
+                pady=6,
+                command=cancel_send
+            )
+            cancel_btn.pack(pady=(5, 0))
         else:
             progress = None
             label = None
             percent_label = None
-
-        if show_ui:
-            bar = ttk.Progressbar(progress, length=350, maximum=len(employees), mode='determinate')
-            bar.pack(pady=10)
-        else:
             bar = None
 
         for i, emp in enumerate(employees):
+            # Проверка отмены операции
+            if cancelled.get('cancelled'):
+                if show_ui:
+                    progress.destroy()
+                messagebox.showinfo("Отменено", f"Отправка остановлена. Отправлено: {success}, не отправлено: {len(employees) - i}")
+                # Сохраняем частично отправленную кампанию
+                break
+
             if show_ui:
                 current_percent = int(((i + 1) / len(employees)) * 100)
                 label.config(text=f"Отправка: {emp['name']}...")
