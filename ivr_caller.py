@@ -693,6 +693,7 @@ class LogServerConnector:
                                 }
 
                                 # START_CALL_TIME
+                                log_entry['START_CALL_TIME'] = 'нет в логе'  # значение по умолчанию
                                 if 'START_CALL_TIME' in line:
                                     start_idx = line.find('"START_CALL_TIME":"')
                                     if start_idx != -1:
@@ -700,10 +701,9 @@ class LogServerConnector:
                                         end_idx = line.find('"', start_idx)
                                         if end_idx != -1:
                                             log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
-                                else:
-                                    log_entry['START_CALL_TIME'] = 'нет в логе'
 
                                 # GSW_CALLING_LIST
+                                log_entry['GSW_CALLING_LIST'] = 'нет в логе'  # значение по умолчанию
                                 if 'GSW_CALLING_LIST' in line:
                                     start_idx = line.find('"GSW_CALLING_LIST":"')
                                     if start_idx != -1:
@@ -711,8 +711,6 @@ class LogServerConnector:
                                         end_idx = line.find('"', start_idx)
                                         if end_idx != -1:
                                             log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
-                                else:
-                                    log_entry['GSW_CALLING_LIST'] = 'нет в логе'
 
                                 # Добавляем запись (ВСЕ записи, не только 3!)
                                 if connid not in found_data:
@@ -2563,11 +2561,24 @@ class IVRCallerApp:
         phone = values[0]  # Телефонный номер
         details = result.get('details', {})
 
-        if phone not in details:
+        # Пытаемся найти номер в разных форматах
+        info = None
+        if phone in details:
+            info = details[phone]
+        else:
+            # Пробуем без плюса
+            phone_without_plus = phone.lstrip('+')
+            if phone_without_plus in details:
+                info = details[phone_without_plus]
+            # Пробуем с плюсом
+            elif not phone.startswith('+'):
+                phone_with_plus = '+' + phone
+                if phone_with_plus in details:
+                    info = details[phone_with_plus]
+
+        if info is None:
             messagebox.showwarning("Внимание", f"Данные для номера {phone} не найдены")
             return
-
-        info = details[phone]
 
         # Создаем окно с деталями
         detail_window = tk.Toplevel(self.root)
