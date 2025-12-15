@@ -1882,6 +1882,21 @@ class IVRCallerApp:
 
         tk.Button(
             btn_frame,
+            text="📊 Проверить доставку",
+            font=("Roboto", 10, "bold"),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
+            command=lambda: self.check_delivery_from_completed()
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        tk.Button(
+            btn_frame,
             text="Экспорт запросов",
             font=("Roboto", 10, "bold"),
             bg=self.colors['primary'],
@@ -2173,30 +2188,9 @@ class IVRCallerApp:
         text_widget.insert("1.0", content)
         text_widget.config(state='disabled')  # Делаем только для чтения
 
-        # Рамка для кнопок
-        btn_frame = ttk.Frame(detail_window)
-        btn_frame.pack(pady=(0, 10))
-
-        # Кнопка проверки доставки
-        check_delivery_btn = tk.Button(
-            btn_frame,
-            text="Проверить доставку",
-            font=("Roboto", 11, "bold"),
-            bg=self.colors['primary'],
-            fg='white',
-            activebackground='#B8050E',
-            activeforeground='white',
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=20,
-            pady=10,
-            command=lambda: self.check_campaign_delivery_ui(campaign)
-        )
-        check_delivery_btn.pack(side=tk.LEFT, padx=5)
-
         # Кнопка закрытия
         close_btn = tk.Button(
-            btn_frame,
+            detail_window,
             text="Закрыть",
             font=("Roboto", 11),
             bg='#E0E0E0',
@@ -2206,11 +2200,38 @@ class IVRCallerApp:
             relief=tk.SOLID,
             borderwidth=1,
             cursor="hand2",
-            padx=20,
+            padx=30,
             pady=10,
             command=detail_window.destroy
         )
-        close_btn.pack(side=tk.LEFT, padx=5)
+        close_btn.pack(pady=(0, 20))
+
+    def check_delivery_from_completed(self):
+        """Проверка доставки из вкладки Завершенные"""
+        # Получаем выбранную кампанию
+        selection = self.completed_tree.selection()
+        if not selection:
+            messagebox.showwarning("Внимание", "Выберите кампанию для проверки доставки")
+            return
+
+        # Получаем ID кампании
+        item = selection[0]
+        campaign_id = self.completed_tree.item(item)['tags'][0]
+
+        # Находим кампанию в истории
+        history = self.load_history()
+        campaign = None
+        for c in history:
+            if c.get('id') == campaign_id:
+                campaign = c
+                break
+
+        if not campaign:
+            messagebox.showerror("Ошибка", "Кампания не найдена в истории")
+            return
+
+        # Вызываем проверку доставки
+        self.check_campaign_delivery_ui(campaign)
 
     def check_campaign_delivery_ui(self, campaign):
         """Проверка доставки кампании через лог-сервер"""
@@ -2270,11 +2291,11 @@ class IVRCallerApp:
             messagebox.showerror("Ошибка", f"Ошибка при проверке доставки:\n{str(e)}")
 
     def show_delivery_results(self, result, campaign):
-        """Отображение результатов проверки доставки"""
+        """Отображение результатов проверки доставки в виде таблицы"""
         # Создаем окно результатов
         results_window = tk.Toplevel(self.root)
         results_window.title("Результаты проверки доставки")
-        results_window.geometry("800x600")
+        results_window.geometry("1000x600")
         results_window.transient(self.root)
 
         # Заголовок
@@ -2284,15 +2305,15 @@ class IVRCallerApp:
 
         tk.Label(
             header_frame,
-            text=f"Статистика доставки: {campaign.get('alert_type', 'кампания')}",
+            text=f"Результаты проверки доставки: {campaign.get('alert_type', 'кампания')}",
             font=("Roboto", 14, "bold"),
             bg=self.colors['primary'],
             fg='white'
         ).pack(pady=15)
 
         # Рамка для статистики
-        stats_frame = tk.Frame(results_window, bg='white')
-        stats_frame.pack(fill=tk.X, padx=20, pady=20)
+        stats_frame = tk.Frame(results_window, bg='#F0F8FF', relief=tk.GROOVE, borderwidth=1)
+        stats_frame.pack(fill=tk.X, padx=20, pady=15)
 
         # Общая статистика
         total = result.get('total', 0)
@@ -2300,96 +2321,91 @@ class IVRCallerApp:
         failed = result.get('failed', 0)
         delivery_rate = (delivered / total * 100) if total > 0 else 0
 
-        stats_text = f"""
-┌─────────────────────────────────────────┐
-│          ОБЩАЯ СТАТИСТИКА              │
-├─────────────────────────────────────────┤
-│  Всего номеров:     {total:>4}              │
-│  Доставлено:        {delivered:>4}  ({delivery_rate:.1f}%)      │
-│  Не доставлено:     {failed:>4}              │
-└─────────────────────────────────────────┘
-        """
+        stats_text = f"📊 Всего: {total}  |  ✅ Отвечено: {delivered} ({delivery_rate:.1f}%)  |  ❌ Не отвечено: {failed}"
 
         tk.Label(
             stats_frame,
             text=stats_text,
-            font=("Consolas", 11),
-            bg='white',
+            font=("Roboto", 11, "bold"),
+            bg='#F0F8FF',
             fg='#333333',
-            justify=tk.LEFT
-        ).pack(pady=10)
+            pady=10
+        ).pack()
 
-        # Детальная информация
-        details_label = tk.Label(
-            results_window,
-            text="Детальная информация по номерам:",
-            font=("Roboto", 12, "bold"),
-            bg='white'
-        )
-        details_label.pack(anchor=tk.W, padx=20, pady=(10, 5))
+        # Таблица результатов
+        table_frame = tk.Frame(results_window)
+        table_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
-        # Рамка для деталей с прокруткой
-        details_frame = tk.Frame(results_window)
-        details_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
-
-        scrollbar = ttk.Scrollbar(details_frame)
+        scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        details_text = tk.Text(
-            details_frame,
-            wrap=tk.WORD,
-            font=("Consolas", 10),
+        columns = ("phone", "connid", "status", "datetime")
+        results_tree = ttk.Treeview(
+            table_frame,
+            columns=columns,
+            show="headings",
             yscrollcommand=scrollbar.set,
-            padx=10,
-            pady=10
+            height=15
         )
-        details_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=details_text.yview)
+        scrollbar.config(command=results_tree.yview)
 
-        # Формируем детальную информацию
-        details_content = ""
+        # Настройка колонок
+        results_tree.heading("phone", text="Телефонный номер")
+        results_tree.heading("connid", text="CONNID")
+        results_tree.heading("status", text="Статус")
+        results_tree.heading("datetime", text="Дата и время ответа")
+
+        results_tree.column("phone", width=150, anchor=tk.CENTER)
+        results_tree.column("connid", width=280, anchor=tk.W)
+        results_tree.column("status", width=120, anchor=tk.CENTER)
+        results_tree.column("datetime", width=180, anchor=tk.CENTER)
+
+        results_tree.pack(fill=tk.BOTH, expand=True)
+
+        # Заполняем таблицу данными
         details = result.get('details', {})
-
-        # Создаем словарь номер -> CONNID для быстрого поиска
-        phone_to_connid = {}
         phones_data = campaign.get('phones_data', [])
+
+        # Создаем словарь номер -> CONNID
+        phone_to_connid = {}
         for phone_info in phones_data:
             phone_num = phone_info.get('number', '')
             connid = phone_info.get('connid', '')
             if phone_num:
                 phone_to_connid[phone_num] = connid
 
-        for i, (phone, info) in enumerate(details.items(), 1):
-            details_content += f"\n{'-' * 70}\n"
-            details_content += f"{i}. Номер: {phone}\n"
-
-            # Показываем CONNID для отладки
-            connid = phone_to_connid.get(phone, 'не найден')
-            details_content += f"   CONNID: {connid}\n"
-            details_content += f"{'-' * 70}\n"
+        # Добавляем строки в таблицу
+        for phone, info in details.items():
+            connid = phone_to_connid.get(phone, 'не указан')
 
             if info['count'] > 0 and info['entries']:
-                # Есть данные - показываем ВСЕ записи
-                for idx, entry in enumerate(info['entries'], 1):
-                    if len(info['entries']) > 1:
-                        details_content += f"\nЗапись #{idx}:\n"
-                    start_time = entry.get('START_CALL_TIME', 'нет данных')
-                    calling_list = entry.get('GSW_CALLING_LIST', 'нет данных')
-                    details_content += f"  START_CALL_TIME: {start_time}\n"
-                    details_content += f"  GSW_CALLING_LIST: {calling_list}\n"
+                # Есть ответ - берем первую запись
+                first_entry = info['entries'][0]
+                status = "✅ Отвечен"
+                datetime_str = first_entry.get('START_CALL_TIME', 'нет данных')
+
+                # Если CONNID слишком длинный, сокращаем для отображения
+                connid_display = connid if len(connid) < 40 else connid[:37] + "..."
+
+                results_tree.insert("", "end", values=(
+                    phone,
+                    connid_display,
+                    status,
+                    datetime_str
+                ))
             else:
-                # Нет данных - CONNID не найден
-                details_content += "  START_CALL_TIME: Нет данных\n"
-                details_content += "  GSW_CALLING_LIST: Нет данных\n"
-                if not connid or connid == 'не найден':
-                    details_content += "  ⚠️ ПРИЧИНА: CONNID отсутствует в данных кампании\n"
-                else:
-                    details_content += f"  ⚠️ ПРИЧИНА: CONNID '{connid}' не найден в логах на сервере\n"
+                # Нет ответа
+                status = "❌ Не отвечен"
+                datetime_str = "-"
 
-            details_content += "\n"
+                connid_display = connid if len(connid) < 40 else connid[:37] + "..."
 
-        details_text.insert("1.0", details_content)
-        details_text.config(state='disabled')
+                results_tree.insert("", "end", values=(
+                    phone,
+                    connid_display,
+                    status,
+                    datetime_str
+                ))
 
         # Рамка для кнопок
         btn_frame = ttk.Frame(results_window)
@@ -2398,7 +2414,7 @@ class IVRCallerApp:
         # Кнопка повторной проверки доставки
         recheck_btn = tk.Button(
             btn_frame,
-            text="Проверить доставку повторно",
+            text="🔄 Проверить доставку повторно",
             font=("Roboto", 11, "bold"),
             bg=self.colors['primary'],
             fg='white',
