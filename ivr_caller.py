@@ -655,7 +655,10 @@ class LogServerConnector:
                         for connid in batch:
                             if connid in line:
                                 # Извлекаем поля
-                                log_entry = {}
+                                log_entry = {
+                                    'raw_line': line,  # Сохраняем полную строку для детального просмотра
+                                    'connid': connid
+                                }
 
                                 # START_CALL_TIME
                                 if 'START_CALL_TIME' in line:
@@ -665,6 +668,8 @@ class LogServerConnector:
                                         end_idx = line.find('"', start_idx)
                                         if end_idx != -1:
                                             log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
+                                else:
+                                    log_entry['START_CALL_TIME'] = 'нет в логе'
 
                                 # GSW_CALLING_LIST
                                 if 'GSW_CALLING_LIST' in line:
@@ -674,6 +679,8 @@ class LogServerConnector:
                                         end_idx = line.find('"', start_idx)
                                         if end_idx != -1:
                                             log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
+                                else:
+                                    log_entry['GSW_CALLING_LIST'] = 'нет в логе'
 
                                 # Добавляем запись (ВСЕ записи, не только 3!)
                                 if connid not in found_data:
@@ -2362,6 +2369,9 @@ class IVRCallerApp:
 
         results_tree.pack(fill=tk.BOTH, expand=True)
 
+        # Двойной клик для просмотра полного ответа с лог-сервера
+        results_tree.bind("<Double-Button-1>", lambda e: self.show_log_entry_details(e, results_tree, result))
+
         # Заполняем таблицу данными
         details = result.get('details', {})
         phones_data = campaign.get('phones_data', [])
@@ -2450,6 +2460,107 @@ class IVRCallerApp:
         """Повторная проверка доставки из окна результатов"""
         results_window.destroy()  # Закрываем текущее окно результатов
         self.check_campaign_delivery_ui(campaign)  # Запускаем проверку заново
+
+    def show_log_entry_details(self, event, tree, result):
+        """Отображение полного ответа с лог-сервера по двойному клику"""
+        selection = tree.selection()
+        if not selection:
+            return
+
+        item = selection[0]
+        values = tree.item(item)['values']
+        if not values:
+            return
+
+        phone = values[0]  # Телефонный номер
+        details = result.get('details', {})
+
+        if phone not in details:
+            messagebox.showwarning("Внимание", f"Данные для номера {phone} не найдены")
+            return
+
+        info = details[phone]
+
+        # Создаем окно с деталями
+        detail_window = tk.Toplevel(self.root)
+        detail_window.title(f"Детали лог-записей для {phone}")
+        detail_window.geometry("900x600")
+        detail_window.transient(self.root)
+
+        # Заголовок
+        header_frame = tk.Frame(detail_window, bg=self.colors['primary'], height=50)
+        header_frame.pack(fill=tk.X)
+        header_frame.pack_propagate(False)
+
+        tk.Label(
+            header_frame,
+            text=f"Полный ответ с лог-сервера: {phone}",
+            font=("Roboto", 12, "bold"),
+            bg=self.colors['primary'],
+            fg='white'
+        ).pack(pady=12)
+
+        # Текстовое поле с прокруткой
+        text_frame = ttk.Frame(detail_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
+
+        scrollbar = ttk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        text_widget = tk.Text(
+            text_frame,
+            wrap=tk.WORD,
+            font=("Consolas", 9),
+            yscrollcommand=scrollbar.set,
+            padx=10,
+            pady=10
+        )
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=text_widget.yview)
+
+        # Формируем содержимое
+        content = ""
+
+        if info['count'] > 0 and info['entries']:
+            content += f"Найдено записей: {info['count']}\n\n"
+            content += "=" * 80 + "\n\n"
+
+            for idx, entry in enumerate(info['entries'], 1):
+                content += f"ЗАПИСЬ #{idx}\n"
+                content += "-" * 80 + "\n"
+                content += f"CONNID: {entry.get('connid', 'нет данных')}\n"
+                content += f"START_CALL_TIME: {entry.get('START_CALL_TIME', 'нет данных')}\n"
+                content += f"GSW_CALLING_LIST: {entry.get('GSW_CALLING_LIST', 'нет данных')}\n\n"
+                content += "ПОЛНАЯ СТРОКА ИЗ ЛОГА:\n"
+                content += entry.get('raw_line', 'нет данных')
+                content += "\n\n" + "=" * 80 + "\n\n"
+        else:
+            content = "❌ Записей не найдено\n\n"
+            content += "Возможные причины:\n"
+            content += "• CONNID отсутствует в данных кампании\n"
+            content += "• CONNID не найден в логах на лог-сервере\n"
+            content += "• Звонок еще не был обработан системой\n"
+
+        text_widget.insert("1.0", content)
+        text_widget.config(state='disabled')
+
+        # Кнопка закрытия
+        close_btn = tk.Button(
+            detail_window,
+            text="Закрыть",
+            font=("Roboto", 10),
+            bg='#E0E0E0',
+            fg='#333333',
+            activebackground='#D0D0D0',
+            activeforeground='#333333',
+            relief=tk.SOLID,
+            borderwidth=1,
+            cursor="hand2",
+            padx=30,
+            pady=8,
+            command=detail_window.destroy
+        )
+        close_btn.pack(pady=(0, 15))
 
     def refresh_queued_history(self):
         """Обновление отображения кампаний в очереди"""
