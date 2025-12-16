@@ -640,6 +640,7 @@ class LogServerConnector:
 
             # Разбиваем CONNID на батчи
             found_data = {}  # CONNID -> список записей
+            parse_failures_logged = 0  # Счетчик для ограничения детального логирования
 
             for batch_idx in range(0, len(connid_list), BATCH_SIZE):
                 # Проверка отмены операции
@@ -728,15 +729,73 @@ class LogServerConnector:
                                 'connid': matched_connid
                             }
 
-                            # START_CALL_TIME
+                            # START_CALL_TIME - с детальным логированием
                             log_entry['START_CALL_TIME'] = 'нет в логе'  # значение по умолчанию
-                            if 'START_CALL_TIME' in line:
+
+                            # Проверяем наличие поля в строке
+                            field_in_line = 'START_CALL_TIME' in line
+
+                            if field_in_line:
+                                # Ищем контекст вокруг поля для логирования
+                                field_pos = line.find('START_CALL_TIME')
+                                context_start = max(0, field_pos - 30)
+                                context_end = min(len(line), field_pos + 80)
+                                context = line[context_start:context_end]
+
+                                # Пытаемся распарсить с двойными кавычками
                                 start_idx = line.find('"START_CALL_TIME":"')
+                                parsing_success = False
+
                                 if start_idx != -1:
                                     start_idx += len('"START_CALL_TIME":"')
                                     end_idx = line.find('"', start_idx)
                                     if end_idx != -1:
                                         log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
+                                        parsing_success = True
+
+                                # Логируем результат парсинга
+                                if self.debug_logger:
+                                    if parsing_success:
+                                        self.debug_logger.debug(f"✅ START_CALL_TIME распарсен успешно", {
+                                            "connid": matched_connid,
+                                            "value": log_entry['START_CALL_TIME'],
+                                            "context": context
+                                        })
+                                    else:
+                                        # Парсинг не удался - детальное логирование
+                                        log_data = {
+                                            "connid": matched_connid,
+                                            "field_found_in_line": True,
+                                            "pattern_with_quotes_found": start_idx != -1,
+                                            "context": context
+                                        }
+
+                                        # Проверяем альтернативные форматы
+                                        alt_formats = {
+                                            "single_quotes": "'START_CALL_TIME':'",
+                                            "with_spaces": '"START_CALL_TIME" : "',
+                                            "equals_format": 'START_CALL_TIME="',
+                                            "lowercase": '"start_call_time":"'
+                                        }
+                                        for fmt_name, fmt_pattern in alt_formats.items():
+                                            log_data[f"format_{fmt_name}"] = fmt_pattern in line
+
+                                        self.debug_logger.warning(f"⚠️ START_CALL_TIME найдено но не распарсилось", log_data)
+
+                                        # Для первых 5 неудач - логируем полную строку
+                                        if parse_failures_logged < 5:
+                                            self.debug_logger.error(f"🔍 Полная строка лога (неудача #{parse_failures_logged + 1})", {
+                                                "connid": matched_connid,
+                                                "full_line": line
+                                            })
+                                            parse_failures_logged += 1
+                            else:
+                                # Поля START_CALL_TIME вообще нет в строке
+                                if self.debug_logger:
+                                    self.debug_logger.debug(f"ℹ️ START_CALL_TIME отсутствует в строке", {
+                                        "connid": matched_connid,
+                                        "line_preview": line[:200]
+                                    })
 
                             # GSW_CALLING_LIST
                             log_entry['GSW_CALLING_LIST'] = 'нет в логе'  # значение по умолчанию
