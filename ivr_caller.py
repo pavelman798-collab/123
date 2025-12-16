@@ -742,16 +742,27 @@ class LogServerConnector:
                                 context_end = min(len(line), field_pos + 80)
                                 context = line[context_start:context_end]
 
-                                # Пытаемся распарсить с двойными кавычками
-                                start_idx = line.find('"START_CALL_TIME":"')
+                                # Пытаемся распарсить с экранированными кавычками (как в JSON логах)
+                                # В логе: \"START_CALL_TIME\": \"2025-12-16T23:46:00.466186\"
+                                start_idx = line.find('\\"START_CALL_TIME\\": \\"')
                                 parsing_success = False
 
                                 if start_idx != -1:
-                                    start_idx += len('"START_CALL_TIME":"')
-                                    end_idx = line.find('"', start_idx)
+                                    start_idx += len('\\"START_CALL_TIME\\": \\"')
+                                    # Ищем закрывающую экранированную кавычку
+                                    end_idx = line.find('\\"', start_idx)
                                     if end_idx != -1:
                                         log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
                                         parsing_success = True
+                                else:
+                                    # Если не нашли с экранированными, пробуем с обычными кавычками
+                                    start_idx = line.find('"START_CALL_TIME":"')
+                                    if start_idx != -1:
+                                        start_idx += len('"START_CALL_TIME":"')
+                                        end_idx = line.find('"', start_idx)
+                                        if end_idx != -1:
+                                            log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
+                                            parsing_success = True
 
                                 # Логируем результат парсинга
                                 if self.debug_logger:
@@ -772,6 +783,8 @@ class LogServerConnector:
 
                                         # Проверяем альтернативные форматы
                                         alt_formats = {
+                                            "escaped_quotes": '\\"START_CALL_TIME\\": \\"',
+                                            "normal_quotes": '"START_CALL_TIME":"',
                                             "single_quotes": "'START_CALL_TIME':'",
                                             "with_spaces": '"START_CALL_TIME" : "',
                                             "equals_format": 'START_CALL_TIME="',
@@ -797,15 +810,24 @@ class LogServerConnector:
                                         "line_preview": line[:200]
                                     })
 
-                            # GSW_CALLING_LIST
+                            # GSW_CALLING_LIST - с экранированными кавычками
                             log_entry['GSW_CALLING_LIST'] = 'нет в логе'  # значение по умолчанию
                             if 'GSW_CALLING_LIST' in line:
-                                start_idx = line.find('"GSW_CALLING_LIST":"')
+                                # Сначала пробуем с экранированными кавычками
+                                start_idx = line.find('\\"GSW_CALLING_LIST\\": \\"')
                                 if start_idx != -1:
-                                    start_idx += len('"GSW_CALLING_LIST":"')
-                                    end_idx = line.find('"', start_idx)
+                                    start_idx += len('\\"GSW_CALLING_LIST\\": \\"')
+                                    end_idx = line.find('\\"', start_idx)
                                     if end_idx != -1:
                                         log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
+                                else:
+                                    # Если не нашли с экранированными, пробуем с обычными
+                                    start_idx = line.find('"GSW_CALLING_LIST":"')
+                                    if start_idx != -1:
+                                        start_idx += len('"GSW_CALLING_LIST":"')
+                                        end_idx = line.find('"', start_idx)
+                                        if end_idx != -1:
+                                            log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
 
                             # Добавляем запись (ВСЕ записи, не только 3!)
                             if matched_connid not in found_data:
