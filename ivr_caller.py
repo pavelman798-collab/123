@@ -668,8 +668,8 @@ class LogServerConnector:
                 # Добавляем флаги оптимизации:
                 # -E - extended regex
                 # -a - обрабатывать как текст
-                # --mmap - использовать memory mapping (быстрее для больших файлов)
-                command = f"grep -E -a --mmap '{pattern}' {log_path}"
+                # Примечание: --mmap убран т.к. не поддерживается на старых версиях grep
+                command = f"grep -E -a '{pattern}' {log_path}"
 
                 if self.debug_logger:
                     self.debug_logger.info(f"Поиск по CONNID батч {batch_num}/{total_batches}", {
