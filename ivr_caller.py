@@ -567,11 +567,13 @@ class LogServerConnector:
                 })
             return {'success': False, 'entries': [], 'count': 0, 'error': error_msg}
 
-    def check_campaign_delivery(self, phones_data):
+    def check_campaign_delivery(self, phones_data, progress_callback=None, cancelled_flag=None):
         """Проверка доставки ТОЛЬКО по CONNID
 
         Args:
             phones_data: list of dicts with 'number' and 'connid'
+            progress_callback: функция для обновления прогресса (current, total, message)
+            cancelled_flag: dict с ключом 'cancelled' для проверки отмены операции
 
         Returns:
             dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
@@ -593,7 +595,20 @@ class LogServerConnector:
         }
 
         try:
+            # Проверка отмены операции
+            if cancelled_flag and cancelled_flag.get('cancelled'):
+                return {
+                    'success': False,
+                    'error': 'Операция отменена пользователем',
+                    'total': len(phones_data),
+                    'delivered': 0,
+                    'failed': len(phones_data),
+                    'details': {}
+                }
+
             if not self.connected:
+                if progress_callback:
+                    progress_callback(0, 1, "Подключение к лог-серверу...")
                 if not self.connect():
                     return {
                         'success': False,
@@ -627,9 +642,26 @@ class LogServerConnector:
             found_data = {}  # CONNID -> список записей
 
             for batch_idx in range(0, len(connid_list), BATCH_SIZE):
+                # Проверка отмены операции
+                if cancelled_flag and cancelled_flag.get('cancelled'):
+                    if self.debug_logger:
+                        self.debug_logger.info("Операция прервана пользователем", {})
+                    return {
+                        'success': False,
+                        'error': 'Операция отменена пользователем',
+                        'total': len(phones_data),
+                        'delivered': results['delivered'],
+                        'failed': results['failed'],
+                        'details': results['details']
+                    }
+
                 batch = connid_list[batch_idx:batch_idx + BATCH_SIZE]
                 batch_num = (batch_idx // BATCH_SIZE) + 1
                 total_batches = (len(connid_list) + BATCH_SIZE - 1) // BATCH_SIZE
+
+                # Обновляем прогресс
+                if progress_callback:
+                    progress_callback(batch_num, total_batches, f"Обработка батча {batch_num} из {total_batches}...")
 
                 # Ищем по CONNID, а НЕ по номеру телефона!
                 pattern = '|'.join(batch)
@@ -655,9 +687,13 @@ class LogServerConnector:
                         for connid in batch:
                             if connid in line:
                                 # Извлекаем поля
-                                log_entry = {}
+                                log_entry = {
+                                    'raw_line': line,  # Сохраняем полную строку для детального просмотра
+                                    'connid': connid
+                                }
 
                                 # START_CALL_TIME
+                                log_entry['START_CALL_TIME'] = 'нет в логе'  # значение по умолчанию
                                 if 'START_CALL_TIME' in line:
                                     start_idx = line.find('"START_CALL_TIME":"')
                                     if start_idx != -1:
@@ -667,6 +703,7 @@ class LogServerConnector:
                                             log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
 
                                 # GSW_CALLING_LIST
+                                log_entry['GSW_CALLING_LIST'] = 'нет в логе'  # значение по умолчанию
                                 if 'GSW_CALLING_LIST' in line:
                                     start_idx = line.find('"GSW_CALLING_LIST":"')
                                     if start_idx != -1:
@@ -1882,6 +1919,21 @@ class IVRCallerApp:
 
         tk.Button(
             btn_frame,
+            text="📊 Проверить доставку",
+            font=("Roboto", 10, "bold"),
+            bg=self.colors['primary'],
+            fg="white",
+            activebackground=self.colors['primary_hover'],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
+            command=lambda: self.check_delivery_from_completed()
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        tk.Button(
+            btn_frame,
             text="Экспорт запросов",
             font=("Roboto", 10, "bold"),
             bg=self.colors['primary'],
@@ -2173,30 +2225,9 @@ class IVRCallerApp:
         text_widget.insert("1.0", content)
         text_widget.config(state='disabled')  # Делаем только для чтения
 
-        # Рамка для кнопок
-        btn_frame = ttk.Frame(detail_window)
-        btn_frame.pack(pady=(0, 10))
-
-        # Кнопка проверки доставки
-        check_delivery_btn = tk.Button(
-            btn_frame,
-            text="Проверить доставку",
-            font=("Roboto", 11, "bold"),
-            bg=self.colors['primary'],
-            fg='white',
-            activebackground='#B8050E',
-            activeforeground='white',
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=20,
-            pady=10,
-            command=lambda: self.check_campaign_delivery_ui(campaign)
-        )
-        check_delivery_btn.pack(side=tk.LEFT, padx=5)
-
         # Кнопка закрытия
         close_btn = tk.Button(
-            btn_frame,
+            detail_window,
             text="Закрыть",
             font=("Roboto", 11),
             bg='#E0E0E0',
@@ -2206,11 +2237,38 @@ class IVRCallerApp:
             relief=tk.SOLID,
             borderwidth=1,
             cursor="hand2",
-            padx=20,
+            padx=30,
             pady=10,
             command=detail_window.destroy
         )
-        close_btn.pack(side=tk.LEFT, padx=5)
+        close_btn.pack(pady=(0, 20))
+
+    def check_delivery_from_completed(self):
+        """Проверка доставки из вкладки Завершенные"""
+        # Получаем выбранную кампанию
+        selection = self.completed_tree.selection()
+        if not selection:
+            messagebox.showwarning("Внимание", "Выберите кампанию для проверки доставки")
+            return
+
+        # Получаем ID кампании
+        item = selection[0]
+        campaign_id = self.completed_tree.item(item)['tags'][0]
+
+        # Находим кампанию в истории
+        history = self.load_history()
+        campaign = None
+        for c in history:
+            if c.get('id') == campaign_id:
+                campaign = c
+                break
+
+        if not campaign:
+            messagebox.showerror("Ошибка", "Кампания не найдена в истории")
+            return
+
+        # Вызываем проверку доставки
+        self.check_campaign_delivery_ui(campaign)
 
     def check_campaign_delivery_ui(self, campaign):
         """Проверка доставки кампании через лог-сервер"""
@@ -2229,34 +2287,89 @@ class IVRCallerApp:
             messagebox.showwarning("Внимание", "В кампании нет номеров телефонов")
             return
 
-        # Показываем окно ожидания
+        # Показываем окно с прогресс-баром
         progress_window = tk.Toplevel(self.root)
         progress_window.title("Проверка доставки")
-        progress_window.geometry("400x150")
+        progress_window.geometry("450x180")
         progress_window.transient(self.root)
         progress_window.grab_set()
 
-        tk.Label(
+        # Заголовок
+        title_label = tk.Label(
             progress_window,
-            text="Подключение к лог-серверу...",
-            font=("Roboto", 12),
-            pady=20
-        ).pack()
+            text="Получение данных с лог-сервера...",
+            font=("Roboto", 12, "bold"),
+            pady=15
+        )
+        title_label.pack()
 
-        tk.Label(
+        # Сообщение о прогрессе
+        status_label = tk.Label(
             progress_window,
             text=f"Проверка {len(phones_data)} номеров",
             font=("Roboto", 10),
             fg='gray'
-        ).pack()
+        )
+        status_label.pack()
+
+        # Прогресс-бар
+        progress_bar = ttk.Progressbar(
+            progress_window,
+            length=350,
+            mode='determinate',
+            maximum=100
+        )
+        progress_bar.pack(pady=15)
+
+        # Флаг отмены операции
+        cancelled = {'cancelled': False}
+
+        # Кнопка отмены
+        def cancel_operation():
+            cancelled['cancelled'] = True
+            cancel_btn.config(state='disabled', text="Отмена...")
+
+        cancel_btn = tk.Button(
+            progress_window,
+            text="Отменить",
+            font=("Roboto", 10),
+            bg='#FF5252',
+            fg='white',
+            activebackground='#D32F2F',
+            activeforeground='white',
+            cursor="hand2",
+            padx=25,
+            pady=8,
+            command=cancel_operation
+        )
+        cancel_btn.pack()
 
         progress_window.update()
 
+        # Функция обновления прогресса
+        def update_progress(current, total, message):
+            if not progress_window.winfo_exists():
+                cancelled['cancelled'] = True
+                return
+            progress = (current / total * 100) if total > 0 else 0
+            progress_bar['value'] = progress
+            status_label.config(text=message)
+            progress_window.update()
+
         try:
-            # Проверяем доставку (передаем phones_data с CONNID)
-            result = self.log_server.check_campaign_delivery(phones_data)
+            # Проверяем доставку с прогрессом и возможностью отмены
+            result = self.log_server.check_campaign_delivery(
+                phones_data,
+                progress_callback=update_progress,
+                cancelled_flag=cancelled
+            )
 
             progress_window.destroy()
+
+            # Проверяем, была ли операция отменена
+            if cancelled.get('cancelled') and result.get('error') == 'Операция отменена пользователем':
+                messagebox.showinfo("Отменено", "Проверка доставки была отменена")
+                return
 
             if not result['success']:
                 messagebox.showerror("Ошибка", f"Ошибка при проверке доставки:\n{result.get('error', 'Неизвестная ошибка')}")
@@ -2266,15 +2379,16 @@ class IVRCallerApp:
             self.show_delivery_results(result, campaign)
 
         except Exception as e:
-            progress_window.destroy()
+            if progress_window.winfo_exists():
+                progress_window.destroy()
             messagebox.showerror("Ошибка", f"Ошибка при проверке доставки:\n{str(e)}")
 
     def show_delivery_results(self, result, campaign):
-        """Отображение результатов проверки доставки"""
+        """Отображение результатов проверки доставки в виде таблицы"""
         # Создаем окно результатов
         results_window = tk.Toplevel(self.root)
         results_window.title("Результаты проверки доставки")
-        results_window.geometry("800x600")
+        results_window.geometry("1000x600")
         results_window.transient(self.root)
 
         # Заголовок
@@ -2284,15 +2398,15 @@ class IVRCallerApp:
 
         tk.Label(
             header_frame,
-            text=f"Статистика доставки: {campaign.get('alert_type', 'кампания')}",
+            text=f"Результаты проверки доставки: {campaign.get('alert_type', 'кампания')}",
             font=("Roboto", 14, "bold"),
             bg=self.colors['primary'],
             fg='white'
         ).pack(pady=15)
 
         # Рамка для статистики
-        stats_frame = tk.Frame(results_window, bg='white')
-        stats_frame.pack(fill=tk.X, padx=20, pady=20)
+        stats_frame = tk.Frame(results_window, bg='#F0F8FF', relief=tk.GROOVE, borderwidth=1)
+        stats_frame.pack(fill=tk.X, padx=20, pady=15)
 
         # Общая статистика
         total = result.get('total', 0)
@@ -2300,96 +2414,94 @@ class IVRCallerApp:
         failed = result.get('failed', 0)
         delivery_rate = (delivered / total * 100) if total > 0 else 0
 
-        stats_text = f"""
-┌─────────────────────────────────────────┐
-│          ОБЩАЯ СТАТИСТИКА              │
-├─────────────────────────────────────────┤
-│  Всего номеров:     {total:>4}              │
-│  Доставлено:        {delivered:>4}  ({delivery_rate:.1f}%)      │
-│  Не доставлено:     {failed:>4}              │
-└─────────────────────────────────────────┘
-        """
+        stats_text = f"📊 Всего: {total}  |  ✅ Отвечено: {delivered} ({delivery_rate:.1f}%)  |  ❌ Не отвечено: {failed}"
 
         tk.Label(
             stats_frame,
             text=stats_text,
-            font=("Consolas", 11),
-            bg='white',
+            font=("Roboto", 11, "bold"),
+            bg='#F0F8FF',
             fg='#333333',
-            justify=tk.LEFT
-        ).pack(pady=10)
+            pady=10
+        ).pack()
 
-        # Детальная информация
-        details_label = tk.Label(
-            results_window,
-            text="Детальная информация по номерам:",
-            font=("Roboto", 12, "bold"),
-            bg='white'
-        )
-        details_label.pack(anchor=tk.W, padx=20, pady=(10, 5))
+        # Таблица результатов
+        table_frame = tk.Frame(results_window)
+        table_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
-        # Рамка для деталей с прокруткой
-        details_frame = tk.Frame(results_window)
-        details_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
-
-        scrollbar = ttk.Scrollbar(details_frame)
+        scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        details_text = tk.Text(
-            details_frame,
-            wrap=tk.WORD,
-            font=("Consolas", 10),
+        columns = ("phone", "connid", "status", "datetime")
+        results_tree = ttk.Treeview(
+            table_frame,
+            columns=columns,
+            show="headings",
             yscrollcommand=scrollbar.set,
-            padx=10,
-            pady=10
+            height=15
         )
-        details_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=details_text.yview)
+        scrollbar.config(command=results_tree.yview)
 
-        # Формируем детальную информацию
-        details_content = ""
+        # Настройка колонок
+        results_tree.heading("phone", text="Телефонный номер")
+        results_tree.heading("connid", text="CONNID")
+        results_tree.heading("status", text="Статус")
+        results_tree.heading("datetime", text="Дата и время ответа")
+
+        results_tree.column("phone", width=150, anchor=tk.CENTER)
+        results_tree.column("connid", width=280, anchor=tk.W)
+        results_tree.column("status", width=120, anchor=tk.CENTER)
+        results_tree.column("datetime", width=180, anchor=tk.CENTER)
+
+        results_tree.pack(fill=tk.BOTH, expand=True)
+
+        # Двойной клик для просмотра полного ответа с лог-сервера
+        results_tree.bind("<Double-Button-1>", lambda e: self.show_log_entry_details(e, results_tree, result))
+
+        # Заполняем таблицу данными
         details = result.get('details', {})
-
-        # Создаем словарь номер -> CONNID для быстрого поиска
-        phone_to_connid = {}
         phones_data = campaign.get('phones_data', [])
+
+        # Создаем словарь номер -> CONNID
+        phone_to_connid = {}
         for phone_info in phones_data:
             phone_num = phone_info.get('number', '')
             connid = phone_info.get('connid', '')
             if phone_num:
                 phone_to_connid[phone_num] = connid
 
-        for i, (phone, info) in enumerate(details.items(), 1):
-            details_content += f"\n{'-' * 70}\n"
-            details_content += f"{i}. Номер: {phone}\n"
-
-            # Показываем CONNID для отладки
-            connid = phone_to_connid.get(phone, 'не найден')
-            details_content += f"   CONNID: {connid}\n"
-            details_content += f"{'-' * 70}\n"
+        # Добавляем строки в таблицу
+        for phone, info in details.items():
+            connid = phone_to_connid.get(phone, 'не указан')
 
             if info['count'] > 0 and info['entries']:
-                # Есть данные - показываем ВСЕ записи
-                for idx, entry in enumerate(info['entries'], 1):
-                    if len(info['entries']) > 1:
-                        details_content += f"\nЗапись #{idx}:\n"
-                    start_time = entry.get('START_CALL_TIME', 'нет данных')
-                    calling_list = entry.get('GSW_CALLING_LIST', 'нет данных')
-                    details_content += f"  START_CALL_TIME: {start_time}\n"
-                    details_content += f"  GSW_CALLING_LIST: {calling_list}\n"
+                # Есть ответ - берем первую запись
+                first_entry = info['entries'][0]
+                status = "✅ Отвечен"
+                datetime_str = first_entry.get('START_CALL_TIME', 'нет данных')
+
+                # Если CONNID слишком длинный, сокращаем для отображения
+                connid_display = connid if len(connid) < 40 else connid[:37] + "..."
+
+                results_tree.insert("", "end", values=(
+                    phone,
+                    connid_display,
+                    status,
+                    datetime_str
+                ))
             else:
-                # Нет данных - CONNID не найден
-                details_content += "  START_CALL_TIME: Нет данных\n"
-                details_content += "  GSW_CALLING_LIST: Нет данных\n"
-                if not connid or connid == 'не найден':
-                    details_content += "  ⚠️ ПРИЧИНА: CONNID отсутствует в данных кампании\n"
-                else:
-                    details_content += f"  ⚠️ ПРИЧИНА: CONNID '{connid}' не найден в логах на сервере\n"
+                # Нет ответа
+                status = "❌ Не отвечен"
+                datetime_str = "-"
 
-            details_content += "\n"
+                connid_display = connid if len(connid) < 40 else connid[:37] + "..."
 
-        details_text.insert("1.0", details_content)
-        details_text.config(state='disabled')
+                results_tree.insert("", "end", values=(
+                    phone,
+                    connid_display,
+                    status,
+                    datetime_str
+                ))
 
         # Рамка для кнопок
         btn_frame = ttk.Frame(results_window)
@@ -2398,7 +2510,7 @@ class IVRCallerApp:
         # Кнопка повторной проверки доставки
         recheck_btn = tk.Button(
             btn_frame,
-            text="Проверить доставку повторно",
+            text="🔄 Проверить доставку повторно",
             font=("Roboto", 11, "bold"),
             bg=self.colors['primary'],
             fg='white',
@@ -2434,6 +2546,120 @@ class IVRCallerApp:
         """Повторная проверка доставки из окна результатов"""
         results_window.destroy()  # Закрываем текущее окно результатов
         self.check_campaign_delivery_ui(campaign)  # Запускаем проверку заново
+
+    def show_log_entry_details(self, event, tree, result):
+        """Отображение полного ответа с лог-сервера по двойному клику"""
+        selection = tree.selection()
+        if not selection:
+            return
+
+        item = selection[0]
+        values = tree.item(item)['values']
+        if not values:
+            return
+
+        phone = values[0]  # Телефонный номер
+        details = result.get('details', {})
+
+        # Пытаемся найти номер в разных форматах
+        info = None
+        if phone in details:
+            info = details[phone]
+        else:
+            # Пробуем без плюса
+            phone_without_plus = phone.lstrip('+')
+            if phone_without_plus in details:
+                info = details[phone_without_plus]
+            # Пробуем с плюсом
+            elif not phone.startswith('+'):
+                phone_with_plus = '+' + phone
+                if phone_with_plus in details:
+                    info = details[phone_with_plus]
+
+        if info is None:
+            messagebox.showwarning("Внимание", f"Данные для номера {phone} не найдены")
+            return
+
+        # Создаем окно с деталями
+        detail_window = tk.Toplevel(self.root)
+        detail_window.title(f"Детали лог-записей для {phone}")
+        detail_window.geometry("900x600")
+        detail_window.transient(self.root)
+
+        # Заголовок
+        header_frame = tk.Frame(detail_window, bg=self.colors['primary'], height=50)
+        header_frame.pack(fill=tk.X)
+        header_frame.pack_propagate(False)
+
+        tk.Label(
+            header_frame,
+            text=f"Полный ответ с лог-сервера: {phone}",
+            font=("Roboto", 12, "bold"),
+            bg=self.colors['primary'],
+            fg='white'
+        ).pack(pady=12)
+
+        # Текстовое поле с прокруткой
+        text_frame = ttk.Frame(detail_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
+
+        scrollbar = ttk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        text_widget = tk.Text(
+            text_frame,
+            wrap=tk.WORD,
+            font=("Consolas", 9),
+            yscrollcommand=scrollbar.set,
+            padx=10,
+            pady=10
+        )
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=text_widget.yview)
+
+        # Формируем содержимое
+        content = ""
+
+        if info['count'] > 0 and info['entries']:
+            content += f"Найдено записей: {info['count']}\n\n"
+            content += "=" * 80 + "\n\n"
+
+            for idx, entry in enumerate(info['entries'], 1):
+                content += f"ЗАПИСЬ #{idx}\n"
+                content += "-" * 80 + "\n"
+                content += f"CONNID: {entry.get('connid', 'нет данных')}\n"
+                content += f"START_CALL_TIME: {entry.get('START_CALL_TIME', 'нет данных')}\n"
+                content += f"GSW_CALLING_LIST: {entry.get('GSW_CALLING_LIST', 'нет данных')}\n\n"
+                content += "ПОЛНАЯ СТРОКА ИЗ ЛОГА:\n"
+                content += entry.get('raw_line', 'нет данных')
+                content += "\n\n" + "=" * 80 + "\n\n"
+        else:
+            content = "❌ Записей не найдено\n\n"
+            content += "Возможные причины:\n"
+            content += "• CONNID отсутствует в данных кампании\n"
+            content += "• CONNID не найден в логах на лог-сервере\n"
+            content += "• Звонок еще не был обработан системой\n"
+
+        text_widget.insert("1.0", content)
+        text_widget.config(state='disabled')
+
+        # Кнопка закрытия
+        close_btn = tk.Button(
+            detail_window,
+            text="Закрыть",
+            font=("Roboto", 10),
+            bg='#E0E0E0',
+            fg='#333333',
+            activebackground='#D0D0D0',
+            activeforeground='#333333',
+            relief=tk.SOLID,
+            borderwidth=1,
+            cursor="hand2",
+            padx=30,
+            pady=8,
+            command=detail_window.destroy
+        )
+        close_btn.pack(pady=(0, 15))
 
     def refresh_queued_history(self):
         """Обновление отображения кампаний в очереди"""
@@ -2822,11 +3048,14 @@ class IVRCallerApp:
         success, fail = 0, 0
         requests_log = []
 
+        # Флаг отмены операции
+        cancelled = {'cancelled': False}
+
         # Создаем прогресс-окно только если show_ui=True
         if show_ui:
             progress = tk.Toplevel(self.root)
             progress.title("Отправка...")
-            progress.geometry("400x160")
+            progress.geometry("400x200")
             progress.transient(self.root)
             progress.grab_set()
 
@@ -2836,18 +3065,45 @@ class IVRCallerApp:
             # Процентный индикатор
             percent_label = ttk.Label(progress, text="0%", font=("Segoe UI", 12, "bold"), foreground="#0066CC")
             percent_label.pack(pady=(0, 10))
+
+            # Прогресс-бар
+            bar = ttk.Progressbar(progress, length=350, maximum=len(employees), mode='determinate')
+            bar.pack(pady=10)
+
+            # Кнопка отмены
+            def cancel_send():
+                cancelled['cancelled'] = True
+                cancel_btn.config(state='disabled', text="Отмена...")
+
+            cancel_btn = tk.Button(
+                progress,
+                text="Остановить отправку",
+                font=("Roboto", 9),
+                bg='#FF5252',
+                fg='white',
+                activebackground='#D32F2F',
+                activeforeground='white',
+                cursor="hand2",
+                padx=20,
+                pady=6,
+                command=cancel_send
+            )
+            cancel_btn.pack(pady=(5, 0))
         else:
             progress = None
             label = None
             percent_label = None
-
-        if show_ui:
-            bar = ttk.Progressbar(progress, length=350, maximum=len(employees), mode='determinate')
-            bar.pack(pady=10)
-        else:
             bar = None
 
         for i, emp in enumerate(employees):
+            # Проверка отмены операции
+            if cancelled.get('cancelled'):
+                if show_ui:
+                    progress.destroy()
+                messagebox.showinfo("Отменено", f"Отправка остановлена. Отправлено: {success}, не отправлено: {len(employees) - i}")
+                # Сохраняем частично отправленную кампанию
+                break
+
             if show_ui:
                 current_percent = int(((i + 1) / len(employees)) * 100)
                 label.config(text=f"Отправка: {emp['name']}...")
