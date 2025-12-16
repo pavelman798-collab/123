@@ -674,11 +674,34 @@ class LogServerConnector:
                 if self.debug_logger:
                     self.debug_logger.info(f"Поиск по CONNID батч {batch_num}/{total_batches}", {
                         "command_length": len(command),
-                        "connids_in_batch": len(batch)
+                        "pattern_length": len(pattern),
+                        "connids_in_batch": len(batch),
+                        "first_connid_in_batch": batch[0] if batch else None,
+                        "last_connid_in_batch": batch[-1] if batch else None
                     })
 
                 stdin, stdout, stderr = self.client.exec_command(command)
                 output = stdout.read().decode('utf-8')
+                error_output = stderr.read().decode('utf-8')
+
+                # КРИТИЧЕСКИ ВАЖНО: Логируем stderr для диагностики проблем
+                if error_output:
+                    if self.debug_logger:
+                        self.debug_logger.error(f"⚠️ STDERR от grep (батч {batch_num})", {
+                            "stderr": error_output,
+                            "command_length": len(command),
+                            "pattern_length": len(pattern)
+                        })
+
+                # Логируем результаты поиска
+                if self.debug_logger:
+                    output_lines_count = len(output.strip().split('\n')) if output.strip() else 0
+                    self.debug_logger.info(f"Результат grep батч {batch_num}/{total_batches}", {
+                        "output_size_bytes": len(output),
+                        "output_lines_count": output_lines_count,
+                        "has_stderr": bool(error_output),
+                        "stderr_preview": error_output[:200] if error_output else None
+                    })
 
                 # Парсим результаты - извлекаем ТОЛЬКО START_CALL_TIME и GSW_CALLING_LIST
                 if output:
@@ -730,6 +753,24 @@ class LogServerConnector:
                                 found_data[matched_connid] = []
                             found_data[matched_connid].append(log_entry)
 
+                # Логируем результаты парсинга для этого батча
+                if self.debug_logger:
+                    found_in_batch = sum(1 for connid in batch if connid in found_data)
+                    self.debug_logger.info(f"Парсинг завершен для батча {batch_num}/{total_batches}", {
+                        "connids_searched": len(batch),
+                        "connids_found": found_in_batch,
+                        "total_entries_in_batch": sum(len(found_data[connid]) for connid in batch if connid in found_data)
+                    })
+
+            # Логируем итоговую статистику по всем батчам
+            if self.debug_logger:
+                self.debug_logger.info("Поиск по всем батчам завершен", {
+                    "total_connids_searched": len(connid_list),
+                    "total_connids_found": len(found_data),
+                    "connids_not_found": len(connid_list) - len(found_data),
+                    "total_log_entries": sum(len(entries) for entries in found_data.values())
+                })
+
             # Формируем результаты для каждого телефона
             for phone_info in phones_data:
                 phone = phone_info.get('number', '')
@@ -751,6 +792,13 @@ class LogServerConnector:
                         'count': 0,
                         'entries': []
                     }
+                    # ВАЖНО: Логируем каждый не найденный CONNID для диагностики
+                    if self.debug_logger and connid:
+                        self.debug_logger.warning(f"⚠️ CONNID не найден в логах", {
+                            "phone": phone,
+                            "connid": connid,
+                            "connid_in_search_list": connid in connid_list
+                        })
 
             total_batches = (len(phones_data) + BATCH_SIZE - 1) // BATCH_SIZE
             if self.debug_logger:
