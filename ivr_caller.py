@@ -578,7 +578,7 @@ class LogServerConnector:
         Returns:
             dict: {'success': bool, 'total': int, 'delivered': int, 'failed': int, 'details': dict}
         """
-        BATCH_SIZE = 50
+        BATCH_SIZE = 200  # Увеличен с 50 до 200 для уменьшения количества запросов
 
         if self.debug_logger:
             self.debug_logger.info("Начало проверки доставки ТОЛЬКО по CONNID", {
@@ -640,6 +640,7 @@ class LogServerConnector:
 
             # Разбиваем CONNID на батчи
             found_data = {}  # CONNID -> список записей
+            parse_failures_logged = 0  # Счетчик для ограничения детального логирования
 
             for batch_idx in range(0, len(connid_list), BATCH_SIZE):
                 # Проверка отмены операции
@@ -665,46 +666,162 @@ class LogServerConnector:
 
                 # Ищем по CONNID, а НЕ по номеру телефона!
                 pattern = '|'.join(batch)
-                command = f"grep -E '{pattern}' {log_path}"
+                # Добавляем флаги оптимизации:
+                # -E - extended regex
+                # -a - обрабатывать как текст
+                # Примечание: --mmap убран т.к. не поддерживается на старых версиях grep
+                command = f"grep -E -a '{pattern}' {log_path}"
 
                 if self.debug_logger:
                     self.debug_logger.info(f"Поиск по CONNID батч {batch_num}/{total_batches}", {
                         "command_length": len(command),
-                        "connids_in_batch": len(batch)
+                        "pattern_length": len(pattern),
+                        "connids_in_batch": len(batch),
+                        "first_connid_in_batch": batch[0] if batch else None,
+                        "last_connid_in_batch": batch[-1] if batch else None
                     })
 
                 stdin, stdout, stderr = self.client.exec_command(command)
                 output = stdout.read().decode('utf-8')
+                error_output = stderr.read().decode('utf-8')
+
+                # КРИТИЧЕСКИ ВАЖНО: Логируем stderr для диагностики проблем
+                if error_output:
+                    if self.debug_logger:
+                        self.debug_logger.error(f"⚠️ STDERR от grep (батч {batch_num})", {
+                            "stderr": error_output,
+                            "command_length": len(command),
+                            "pattern_length": len(pattern)
+                        })
+
+                # Логируем результаты поиска
+                if self.debug_logger:
+                    output_lines_count = len(output.strip().split('\n')) if output.strip() else 0
+                    self.debug_logger.info(f"Результат grep батч {batch_num}/{total_batches}", {
+                        "output_size_bytes": len(output),
+                        "output_lines_count": output_lines_count,
+                        "has_stderr": bool(error_output),
+                        "stderr_preview": error_output[:200] if error_output else None
+                    })
 
                 # Парсим результаты - извлекаем ТОЛЬКО START_CALL_TIME и GSW_CALLING_LIST
                 if output:
                     lines = output.strip().split('\n')
+                    # Создаем set для быстрой проверки наличия CONNID в батче
+                    batch_set = set(batch)
+
                     for line in lines:
                         if not line.strip():
                             continue
 
                         # Определяем какому CONNID принадлежит запись
-                        for connid in batch:
+                        # Ищем любой CONNID из батча в строке
+                        matched_connid = None
+                        for connid in batch_set:
                             if connid in line:
-                                # Извлекаем поля
-                                log_entry = {
-                                    'raw_line': line,  # Сохраняем полную строку для детального просмотра
-                                    'connid': connid
-                                }
+                                matched_connid = connid
+                                break
 
-                                # START_CALL_TIME
-                                log_entry['START_CALL_TIME'] = 'нет в логе'  # значение по умолчанию
-                                if 'START_CALL_TIME' in line:
+                        if matched_connid:
+                            # Извлекаем поля
+                            log_entry = {
+                                'raw_line': line,  # Сохраняем полную строку для детального просмотра
+                                'connid': matched_connid
+                            }
+
+                            # START_CALL_TIME - с детальным логированием
+                            log_entry['START_CALL_TIME'] = 'нет в логе'  # значение по умолчанию
+
+                            # Проверяем наличие поля в строке
+                            field_in_line = 'START_CALL_TIME' in line
+
+                            if field_in_line:
+                                # Ищем контекст вокруг поля для логирования
+                                field_pos = line.find('START_CALL_TIME')
+                                context_start = max(0, field_pos - 30)
+                                context_end = min(len(line), field_pos + 80)
+                                context = line[context_start:context_end]
+
+                                # Пытаемся распарсить с экранированными кавычками (как в JSON логах)
+                                # В логе: \"START_CALL_TIME\": \"2025-12-16T23:46:00.466186\"
+                                start_idx = line.find('\\"START_CALL_TIME\\": \\"')
+                                parsing_success = False
+
+                                if start_idx != -1:
+                                    start_idx += len('\\"START_CALL_TIME\\": \\"')
+                                    # Ищем закрывающую экранированную кавычку
+                                    end_idx = line.find('\\"', start_idx)
+                                    if end_idx != -1:
+                                        log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
+                                        parsing_success = True
+                                else:
+                                    # Если не нашли с экранированными, пробуем с обычными кавычками
                                     start_idx = line.find('"START_CALL_TIME":"')
                                     if start_idx != -1:
                                         start_idx += len('"START_CALL_TIME":"')
                                         end_idx = line.find('"', start_idx)
                                         if end_idx != -1:
                                             log_entry['START_CALL_TIME'] = line[start_idx:end_idx]
+                                            parsing_success = True
 
-                                # GSW_CALLING_LIST
-                                log_entry['GSW_CALLING_LIST'] = 'нет в логе'  # значение по умолчанию
-                                if 'GSW_CALLING_LIST' in line:
+                                # Логируем результат парсинга
+                                if self.debug_logger:
+                                    if parsing_success:
+                                        self.debug_logger.debug(f"✅ START_CALL_TIME распарсен успешно", {
+                                            "connid": matched_connid,
+                                            "value": log_entry['START_CALL_TIME'],
+                                            "context": context
+                                        })
+                                    else:
+                                        # Парсинг не удался - детальное логирование
+                                        log_data = {
+                                            "connid": matched_connid,
+                                            "field_found_in_line": True,
+                                            "pattern_with_quotes_found": start_idx != -1,
+                                            "context": context
+                                        }
+
+                                        # Проверяем альтернативные форматы
+                                        alt_formats = {
+                                            "escaped_quotes": '\\"START_CALL_TIME\\": \\"',
+                                            "normal_quotes": '"START_CALL_TIME":"',
+                                            "single_quotes": "'START_CALL_TIME':'",
+                                            "with_spaces": '"START_CALL_TIME" : "',
+                                            "equals_format": 'START_CALL_TIME="',
+                                            "lowercase": '"start_call_time":"'
+                                        }
+                                        for fmt_name, fmt_pattern in alt_formats.items():
+                                            log_data[f"format_{fmt_name}"] = fmt_pattern in line
+
+                                        self.debug_logger.warning(f"⚠️ START_CALL_TIME найдено но не распарсилось", log_data)
+
+                                        # Для первых 5 неудач - логируем полную строку
+                                        if parse_failures_logged < 5:
+                                            self.debug_logger.error(f"🔍 Полная строка лога (неудача #{parse_failures_logged + 1})", {
+                                                "connid": matched_connid,
+                                                "full_line": line
+                                            })
+                                            parse_failures_logged += 1
+                            else:
+                                # Поля START_CALL_TIME вообще нет в строке
+                                if self.debug_logger:
+                                    self.debug_logger.debug(f"ℹ️ START_CALL_TIME отсутствует в строке", {
+                                        "connid": matched_connid,
+                                        "line_preview": line[:200]
+                                    })
+
+                            # GSW_CALLING_LIST - с экранированными кавычками
+                            log_entry['GSW_CALLING_LIST'] = 'нет в логе'  # значение по умолчанию
+                            if 'GSW_CALLING_LIST' in line:
+                                # Сначала пробуем с экранированными кавычками
+                                start_idx = line.find('\\"GSW_CALLING_LIST\\": \\"')
+                                if start_idx != -1:
+                                    start_idx += len('\\"GSW_CALLING_LIST\\": \\"')
+                                    end_idx = line.find('\\"', start_idx)
+                                    if end_idx != -1:
+                                        log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
+                                else:
+                                    # Если не нашли с экранированными, пробуем с обычными
                                     start_idx = line.find('"GSW_CALLING_LIST":"')
                                     if start_idx != -1:
                                         start_idx += len('"GSW_CALLING_LIST":"')
@@ -712,11 +829,28 @@ class LogServerConnector:
                                         if end_idx != -1:
                                             log_entry['GSW_CALLING_LIST'] = line[start_idx:end_idx]
 
-                                # Добавляем запись (ВСЕ записи, не только 3!)
-                                if connid not in found_data:
-                                    found_data[connid] = []
-                                found_data[connid].append(log_entry)
-                                break  # Нашли CONNID, переходим к следующей строке
+                            # Добавляем запись (ВСЕ записи, не только 3!)
+                            if matched_connid not in found_data:
+                                found_data[matched_connid] = []
+                            found_data[matched_connid].append(log_entry)
+
+                # Логируем результаты парсинга для этого батча
+                if self.debug_logger:
+                    found_in_batch = sum(1 for connid in batch if connid in found_data)
+                    self.debug_logger.info(f"Парсинг завершен для батча {batch_num}/{total_batches}", {
+                        "connids_searched": len(batch),
+                        "connids_found": found_in_batch,
+                        "total_entries_in_batch": sum(len(found_data[connid]) for connid in batch if connid in found_data)
+                    })
+
+            # Логируем итоговую статистику по всем батчам
+            if self.debug_logger:
+                self.debug_logger.info("Поиск по всем батчам завершен", {
+                    "total_connids_searched": len(connid_list),
+                    "total_connids_found": len(found_data),
+                    "connids_not_found": len(connid_list) - len(found_data),
+                    "total_log_entries": sum(len(entries) for entries in found_data.values())
+                })
 
             # Формируем результаты для каждого телефона
             for phone_info in phones_data:
@@ -739,6 +873,13 @@ class LogServerConnector:
                         'count': 0,
                         'entries': []
                     }
+                    # ВАЖНО: Логируем каждый не найденный CONNID для диагностики
+                    if self.debug_logger and connid:
+                        self.debug_logger.warning(f"⚠️ CONNID не найден в логах", {
+                            "phone": phone,
+                            "connid": connid,
+                            "connid_in_search_list": connid in connid_list
+                        })
 
             total_batches = (len(phones_data) + BATCH_SIZE - 1) // BATCH_SIZE
             if self.debug_logger:
