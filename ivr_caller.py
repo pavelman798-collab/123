@@ -1124,9 +1124,9 @@ class IVRCallerApp:
         # Запускаем проверку отложенных кампаний
         self.root.after(5000, self.check_scheduled_campaigns)
 
-        # ВРЕМЕННО ОТКЛЮЧЕНО: Создаем снежинки после того, как окно отрисовалось
-        # self.root.after(100, self.setup_snowflakes)
-        # self.root.after(150, self.animate_snowflakes)
+        # Создаем снежинки после того, как окно отрисовалось
+        self.root.after(200, self.setup_snowflakes)
+        self.root.after(300, self.animate_snowflakes)
 
     def _load_connid(self):
         try:
@@ -1160,68 +1160,56 @@ class IVRCallerApp:
         self.root.geometry(f"+{x}+{y}")
 
     def setup_snowflakes(self):
-        """Создание Canvas для снежинок и инициализация снежинок"""
-        # Создаем Canvas для снежинок БЕЗ фона (прозрачный)
-        self.snow_canvas = tk.Canvas(
-            self.root,
-            highlightthickness=0
-        )
-        self.snow_canvas.place(x=0, y=0, relwidth=1, relheight=1)
-        # Опускаем Canvas за все остальные элементы
-        self.snow_canvas.lower()
-
-        # Делаем Canvas игнорирующим события мыши
-        self.snow_canvas.configure(takefocus=0)
-        self.snow_canvas.bind("<Button-1>", lambda e: "break")
-
-        # Создаем 50 снежинок
+        """Создание снежинок как Label виджетов"""
+        # Получаем размеры окна
         width = self.root.winfo_width() or 850
         height = self.root.winfo_height() or 700
 
-        for _ in range(50):
+        # Создаем 30 снежинок (меньше, чтобы не перегружать)
+        for _ in range(30):
             snowflake = Snowflake(width, height)
             self.snowflakes.append(snowflake)
-            # Создаем графический элемент снежинки
-            item = self.snow_canvas.create_oval(
-                snowflake.x - snowflake.size,
-                snowflake.y - snowflake.size,
-                snowflake.x + snowflake.size,
-                snowflake.y + snowflake.size,
-                fill='white',
-                outline='white'
+
+            # Создаем Label для снежинки
+            label = tk.Label(
+                self.root,
+                text='❄',  # Символ снежинки
+                fg='white',
+                bg=self.colors['bg'],
+                font=('Arial', snowflake.size * 3)
             )
-            self.snowflake_items.append(item)
+            # Размещаем снежинку
+            label.place(x=snowflake.x, y=snowflake.y)
+            # Делаем Label игнорирующим клики
+            label.configure(cursor='')
+            # Сохраняем ссылку
+            self.snowflake_items.append(label)
 
     def animate_snowflakes(self):
         """Анимация падения снежинок"""
         try:
             # Проверяем, что снежинки созданы
-            if not hasattr(self, 'snow_canvas') or not self.snowflakes:
+            if not self.snowflakes or not self.snowflake_items:
                 return
 
             width = self.root.winfo_width()
             height = self.root.winfo_height()
 
             for i, snowflake in enumerate(self.snowflakes):
-                # Обновляем ширину и высоту canvas
+                # Обновляем ширину и высоту окна
                 snowflake.canvas_width = width
                 snowflake.canvas_height = height
 
                 # Обновляем позицию снежинки
                 snowflake.update()
 
-                # Перемещаем графический элемент
-                self.snow_canvas.coords(
-                    self.snowflake_items[i],
-                    snowflake.x - snowflake.size,
-                    snowflake.y - snowflake.size,
-                    snowflake.x + snowflake.size,
-                    snowflake.y + snowflake.size
-                )
+                # Перемещаем Label снежинки
+                label = self.snowflake_items[i]
+                label.place(x=int(snowflake.x), y=int(snowflake.y))
 
-            # Продолжаем анимацию (60 FPS)
-            self.root.after(16, self.animate_snowflakes)
-        except (tk.TclError, AttributeError):
+            # Продолжаем анимацию (30 FPS для экономии ресурсов)
+            self.root.after(33, self.animate_snowflakes)
+        except (tk.TclError, AttributeError, IndexError):
             # Окно закрыто или снежинки не созданы, останавливаем анимацию
             pass
 
