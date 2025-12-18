@@ -1169,35 +1169,42 @@ class IVRCallerApp:
         logo_container = tk.Frame(header_frame, bg=self.colors['header_bg'])
         logo_container.pack(side=tk.LEFT, padx=20, pady=10)
 
-        # Красный квадрат с логотипом МТС (буквы по углам)
-        logo_square = tk.Frame(
+        # Создаем Canvas для логотипа МТС
+        logo_canvas = tk.Canvas(
             logo_container,
+            width=50,
+            height=50,
             bg="#E30611",
-            width=60,
-            height=60
+            highlightthickness=0
         )
-        logo_square.pack(side=tk.LEFT)
-        logo_square.pack_propagate(False)
+        logo_canvas.pack(side=tk.LEFT)
 
         # Буква М в левом верхнем углу
-        m_label = tk.Label(
-            logo_square,
+        logo_canvas.create_text(
+            5, 5,
             text="М",
-            font=("Arial", 28, "bold"),
-            bg="#E30611",
-            fg="#FFFFFF"
+            font=("Arial", 20, "bold"),
+            fill="#FFFFFF",
+            anchor="nw"
         )
-        m_label.place(x=2, y=-5)
+
+        # Буква Т в правом верхнем углу
+        logo_canvas.create_text(
+            45, 5,
+            text="Т",
+            font=("Arial", 20, "bold"),
+            fill="#FFFFFF",
+            anchor="ne"
+        )
 
         # Буква С в правом нижнем углу
-        c_label = tk.Label(
-            logo_square,
+        logo_canvas.create_text(
+            45, 45,
             text="С",
-            font=("Arial", 28, "bold"),
-            bg="#E30611",
-            fg="#FFFFFF"
+            font=("Arial", 20, "bold"),
+            fill="#FFFFFF",
+            anchor="se"
         )
-        c_label.place(relx=1.0, rely=1.0, x=-32, y=-35)
 
         # Название приложения
         tk.Label(
@@ -1372,6 +1379,53 @@ class IVRCallerApp:
                     activebackground='#D0D0D0',
                     activeforeground='#333333'
                 )
+
+    def switch_history_tab(self, tab_name):
+        """Переключение между подвкладками истории"""
+        if self.current_history_tab == tab_name:
+            return
+
+        self.current_history_tab = tab_name
+
+        # Скрываем все подвкладки
+        self.queued_frame.pack_forget()
+        self.completed_frame.pack_forget()
+
+        # Обновляем стили кнопок
+        if tab_name == 'queued':
+            # Активируем кнопку "В очереди"
+            self.queued_btn.config(
+                bg=self.colors['primary'],
+                fg='#FFFFFF',
+                activebackground=self.colors['primary_hover'],
+                activeforeground='#FFFFFF'
+            )
+            # Деактивируем кнопку "Завершенные"
+            self.completed_btn.config(
+                bg='#E0E0E0',
+                fg='#333333',
+                activebackground='#D0D0D0',
+                activeforeground='#333333'
+            )
+            # Показываем "В очереди"
+            self.queued_frame.pack(fill=tk.BOTH, expand=True)
+        else:
+            # Деактивируем кнопку "В очереди"
+            self.queued_btn.config(
+                bg='#E0E0E0',
+                fg='#333333',
+                activebackground='#D0D0D0',
+                activeforeground='#333333'
+            )
+            # Активируем кнопку "Завершенные"
+            self.completed_btn.config(
+                bg=self.colors['primary'],
+                fg='#FFFFFF',
+                activebackground=self.colors['primary_hover'],
+                activeforeground='#FFFFFF'
+            )
+            # Показываем "Завершенные"
+            self.completed_frame.pack(fill=tk.BOTH, expand=True)
 
     def setup_constructor_tab(self):
         # Инициализация списка номеров
@@ -1990,19 +2044,61 @@ class IVRCallerApp:
 
     def setup_history_tab(self):
         """Вкладка истории кампаний"""
-        # Создаем подвкладки для истории
-        self.history_notebook = ttk.Notebook(self.history_frame)
-        self.history_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Навигационные кнопки для подвкладок
+        history_nav_container = tk.Frame(self.history_frame, bg=self.colors['bg'])
+        history_nav_container.pack(fill=tk.X, padx=10, pady=(10, 10))
 
-        # Подвкладка "В очереди"
-        self.queued_frame = ttk.Frame(self.history_notebook)
-        self.history_notebook.add(self.queued_frame, text="⏳ В очереди")
+        # Переменная для отслеживания активной подвкладки
+        self.current_history_tab = 'queued'
+
+        # Кнопка "В очереди"
+        self.queued_btn = tk.Button(
+            history_nav_container,
+            text="⏳ В очереди",
+            font=("Roboto", 11, "bold"),
+            bg=self.colors['primary'],
+            fg='#FFFFFF',
+            activebackground=self.colors['primary_hover'],
+            activeforeground='#FFFFFF',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=25,
+            pady=12,
+            command=lambda: self.switch_history_tab('queued')
+        )
+        self.queued_btn.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
+
+        # Кнопка "Завершенные"
+        self.completed_btn = tk.Button(
+            history_nav_container,
+            text="✅ Завершенные",
+            font=("Roboto", 11, "bold"),
+            bg='#E0E0E0',
+            fg='#333333',
+            activebackground='#D0D0D0',
+            activeforeground='#333333',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=25,
+            pady=12,
+            command=lambda: self.switch_history_tab('completed')
+        )
+        self.completed_btn.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Контейнер для содержимого подвкладок
+        self.history_tabs_container = tk.Frame(self.history_frame, bg=self.colors['bg'])
+        self.history_tabs_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        # Создаем фреймы для подвкладок
+        self.queued_frame = tk.Frame(self.history_tabs_container, bg=self.colors['bg'])
+        self.completed_frame = tk.Frame(self.history_tabs_container, bg=self.colors['bg'])
+
+        # Настраиваем содержимое подвкладок
         self.setup_queued_tab()
-
-        # Подвкладка "Завершенные"
-        self.completed_frame = ttk.Frame(self.history_notebook)
-        self.history_notebook.add(self.completed_frame, text="✅ Завершенные")
         self.setup_completed_tab()
+
+        # Показываем "В очереди" по умолчанию
+        self.queued_frame.pack(fill=tk.BOTH, expand=True)
 
     def setup_queued_tab(self):
         """Подвкладка с кампаниями в очереди"""
