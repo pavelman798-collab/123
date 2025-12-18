@@ -1124,9 +1124,9 @@ class IVRCallerApp:
         # Запускаем проверку отложенных кампаний
         self.root.after(5000, self.check_scheduled_campaigns)
 
-        # Создаем снежинки после того, как окно отрисовалось
-        self.root.after(100, self.setup_snowflakes)
-        self.root.after(150, self.animate_snowflakes)
+        # ВРЕМЕННО ОТКЛЮЧЕНО: Создаем снежинки после того, как окно отрисовалось
+        # self.root.after(100, self.setup_snowflakes)
+        # self.root.after(150, self.animate_snowflakes)
 
     def _load_connid(self):
         try:
@@ -1161,15 +1161,18 @@ class IVRCallerApp:
 
     def setup_snowflakes(self):
         """Создание Canvas для снежинок и инициализация снежинок"""
-        # Создаем прозрачный Canvas поверх всего окна
+        # Создаем Canvas для снежинок БЕЗ фона (прозрачный)
         self.snow_canvas = tk.Canvas(
             self.root,
-            bg=self.colors['bg'],
             highlightthickness=0
         )
         self.snow_canvas.place(x=0, y=0, relwidth=1, relheight=1)
-        # Делаем Canvas прозрачным для кликов (события проходят насквозь)
+        # Опускаем Canvas за все остальные элементы
         self.snow_canvas.lower()
+
+        # Делаем Canvas игнорирующим события мыши
+        self.snow_canvas.configure(takefocus=0)
+        self.snow_canvas.bind("<Button-1>", lambda e: "break")
 
         # Создаем 50 снежинок
         width = self.root.winfo_width() or 850
