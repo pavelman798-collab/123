@@ -1263,6 +1263,9 @@ class IVRCallerApp:
 
         # Пытаемся загрузить логотип из файла
         logo_path = os.path.join(BASE_DIR, "assets", "logo_mts.png")
+        print(f"🔍 Поиск логотипа: {logo_path}")
+        print(f"📁 Файл существует: {os.path.exists(logo_path)}")
+
         if os.path.exists(logo_path):
             try:
                 # Загружаем изображение
@@ -1274,12 +1277,15 @@ class IVRCallerApp:
                     bg=self.colors['header_bg']
                 )
                 logo_label.pack(side=tk.LEFT)
+                print(f"✅ Логотип загружен успешно!")
             except Exception as e:
                 # Если не удалось загрузить, показываем заглушку
-                self._create_logo_placeholder(logo_container)
+                print(f"❌ Ошибка загрузки логотипа: {e}")
+                self._create_logo_placeholder(logo_container, logo_path)
         else:
             # Файл не найден - показываем заглушку с инструкцией
-            self._create_logo_placeholder(logo_container)
+            print(f"❌ Файл не найден: {logo_path}")
+            self._create_logo_placeholder(logo_container, logo_path)
 
         # Название приложения
         tk.Label(
@@ -3968,7 +3974,7 @@ class IVRCallerApp:
             for label in self.snowflake_items:
                 label.place_forget()
 
-    def _create_logo_placeholder(self, container):
+    def _create_logo_placeholder(self, container, logo_path=None):
         """Создает заглушку для логотипа когда файл не найден"""
         # Красный квадрат с текстом "LOGO"
         placeholder = tk.Label(
@@ -3984,10 +3990,11 @@ class IVRCallerApp:
         )
         placeholder.pack(side=tk.LEFT)
 
-        # Добавляем подсказку
-        ToolTip(placeholder,
-                "Поместите logo_mts.png в папку assets/\n"
-                "Размер: 50x50 пикселей")
+        # Добавляем подсказку с путем к файлу
+        tooltip_text = "Поместите logo_mts.png в папку assets/\nРазмер: 50x50 пикселей"
+        if logo_path:
+            tooltip_text += f"\n\nОжидаемый путь:\n{logo_path}"
+        ToolTip(placeholder, tooltip_text)
 
     def get_dashboard_metrics(self):
         """Получение метрик для Dashboard"""
