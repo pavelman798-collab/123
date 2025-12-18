@@ -1174,9 +1174,9 @@ class IVRCallerApp:
             label = tk.Label(
                 self.root,
                 text='❄',  # Символ снежинки
-                fg='white',
+                fg='#87CEEB',  # Голубой цвет (Sky Blue)
                 bg=self.colors['bg'],
-                font=('Arial', snowflake.size * 3)
+                font=('Arial', snowflake.size)  # Уменьшен в 3 раза
             )
             # Размещаем снежинку
             label.place(x=snowflake.x, y=snowflake.y)
