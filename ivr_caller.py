@@ -1257,46 +1257,29 @@ class IVRCallerApp:
         header_frame.pack(fill=tk.X)
         header_frame.pack_propagate(False)
 
-        # Логотип МТС - красный квадрат с белым текстом
+        # Логотип МТС - загружается из файла
         logo_container = tk.Frame(header_frame, bg=self.colors['header_bg'])
         logo_container.pack(side=tk.LEFT, padx=20, pady=10)
 
-        # Создаем Canvas для логотипа МТС
-        logo_canvas = tk.Canvas(
-            logo_container,
-            width=50,
-            height=50,
-            bg="#E30611",
-            highlightthickness=0
-        )
-        logo_canvas.pack(side=tk.LEFT)
-
-        # Буква М в левом верхнем углу
-        logo_canvas.create_text(
-            5, 5,
-            text="М",
-            font=("Arial", 20, "bold"),
-            fill="#FFFFFF",
-            anchor="nw"
-        )
-
-        # Буква Т в правом верхнем углу
-        logo_canvas.create_text(
-            45, 5,
-            text="Т",
-            font=("Arial", 20, "bold"),
-            fill="#FFFFFF",
-            anchor="ne"
-        )
-
-        # Буква С в правом нижнем углу
-        logo_canvas.create_text(
-            45, 45,
-            text="С",
-            font=("Arial", 20, "bold"),
-            fill="#FFFFFF",
-            anchor="se"
-        )
+        # Пытаемся загрузить логотип из файла
+        logo_path = os.path.join(BASE_DIR, "assets", "logo_mts.png")
+        if os.path.exists(logo_path):
+            try:
+                # Загружаем изображение
+                self.logo_image = tk.PhotoImage(file=logo_path)
+                # Изменяем размер до 50x50 (если нужно)
+                logo_label = tk.Label(
+                    logo_container,
+                    image=self.logo_image,
+                    bg=self.colors['header_bg']
+                )
+                logo_label.pack(side=tk.LEFT)
+            except Exception as e:
+                # Если не удалось загрузить, показываем заглушку
+                self._create_logo_placeholder(logo_container)
+        else:
+            # Файл не найден - показываем заглушку с инструкцией
+            self._create_logo_placeholder(logo_container)
 
         # Название приложения
         tk.Label(
@@ -1307,10 +1290,29 @@ class IVRCallerApp:
             fg=self.colors['header_fg']
         ).pack(side=tk.LEFT, padx=(12, 0))
 
-        # Переключатель темы
+        # Переключатель темы и снежинок
         theme_frame = tk.Frame(header_frame, bg=self.colors['header_bg'])
         theme_frame.pack(side=tk.RIGHT, padx=20)
 
+        # Кнопка снежинок
+        self.snowflakes_enabled = True
+        self.snow_btn = tk.Button(
+            theme_frame,
+            text="❄ Снежинки",
+            font=("Roboto", 10),
+            bg=self.colors['header_bg'],
+            fg=self.colors['header_fg'],
+            activebackground=self.colors['primary_hover'],
+            activeforeground=self.colors['header_fg'],
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
+            command=self.toggle_snowflakes
+        )
+        self.snow_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        # Кнопка смены темы
         theme_btn = tk.Button(
             theme_frame,
             text="◐ Сменить тему",
@@ -1325,7 +1327,7 @@ class IVRCallerApp:
             pady=8,
             command=self.toggle_theme
         )
-        theme_btn.pack()
+        theme_btn.pack(side=tk.LEFT)
 
         # Навигационные кнопки-плиточки
         nav_container = tk.Frame(self.root, bg=self.colors['bg'])
@@ -3945,6 +3947,47 @@ class IVRCallerApp:
             f"Тема изменена на {'темную' if new_theme == 'dark' else 'светлую'}!\n\n"
             f"Перезапустите приложение для применения изменений."
         )
+
+    def toggle_snowflakes(self):
+        """Включение/выключение анимации снежинок"""
+        self.snowflakes_enabled = not self.snowflakes_enabled
+
+        if self.snowflakes_enabled:
+            # Включаем снежинки
+            self.snow_btn.config(text="❄ Снежинки")
+            # Создаем снежинки если их нет
+            if not self.snowflakes:
+                self.setup_snowflakes()
+            # Показываем все снежинки
+            for label in self.snowflake_items:
+                label.place_configure()
+        else:
+            # Выключаем снежинки
+            self.snow_btn.config(text="❄ Снежинки (выкл)")
+            # Скрываем все снежинки
+            for label in self.snowflake_items:
+                label.place_forget()
+
+    def _create_logo_placeholder(self, container):
+        """Создает заглушку для логотипа когда файл не найден"""
+        # Красный квадрат с текстом "LOGO"
+        placeholder = tk.Label(
+            container,
+            text="LOGO\n50x50",
+            font=("Arial", 8, "bold"),
+            bg="#E30611",
+            fg="#FFFFFF",
+            width=7,
+            height=3,
+            relief=tk.SOLID,
+            borderwidth=1
+        )
+        placeholder.pack(side=tk.LEFT)
+
+        # Добавляем подсказку
+        ToolTip(placeholder,
+                "Поместите logo_mts.png в папку assets/\n"
+                "Размер: 50x50 пикселей")
 
     def get_dashboard_metrics(self):
         """Получение метрик для Dashboard"""
