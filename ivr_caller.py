@@ -66,8 +66,8 @@ class MTSTheme:
         'error': '#DC3545',
         'text_muted': '#6C757D',
         'input_bg': '#FFFFFF',
-        'header_bg': '#E30611',
-        'header_fg': '#FFFFFF'
+        'header_bg': '#FFFFFF',
+        'header_fg': '#333333'
     }
 
     # Темная тема
@@ -85,8 +85,8 @@ class MTSTheme:
         'error': '#E74C3C',
         'text_muted': '#95A5A6',
         'input_bg': '#2D2D2D',
-        'header_bg': '#252525',
-        'header_fg': '#FFFFFF'
+        'header_bg': '#2D2D2D',
+        'header_fg': '#E0E0E0'
     }
 
     @staticmethod
@@ -178,7 +178,8 @@ class ToolTip:
         tw.wm_geometry(f"+{x}+{y}")
         label = tk.Label(
             tw, text=self.text, justify=tk.LEFT,
-            background="#FFFFCC", relief=tk.SOLID, borderwidth=1,
+            background="#FFFFCC", relief=tk.FLAT,
+            highlightbackground='#D0D0D0', highlightthickness=1,
             font=("Roboto", 9), padx=10, pady=5
         )
         label.pack()
@@ -1168,17 +1169,35 @@ class IVRCallerApp:
         logo_container = tk.Frame(header_frame, bg=self.colors['header_bg'])
         logo_container.pack(side=tk.LEFT, padx=20, pady=10)
 
-        # Красный квадрат с логотипом МТС
-        logo_label = tk.Label(
+        # Красный квадрат с логотипом МТС (буквы по углам)
+        logo_square = tk.Frame(
             logo_container,
-            text="МТС",
-            font=("Arial", 24, "bold"),
             bg="#E30611",
-            fg="#FFFFFF",
-            padx=12,
-            pady=8
+            width=60,
+            height=60
         )
-        logo_label.pack(side=tk.LEFT)
+        logo_square.pack(side=tk.LEFT)
+        logo_square.pack_propagate(False)
+
+        # Буква М в левом верхнем углу
+        m_label = tk.Label(
+            logo_square,
+            text="М",
+            font=("Arial", 28, "bold"),
+            bg="#E30611",
+            fg="#FFFFFF"
+        )
+        m_label.place(x=2, y=-5)
+
+        # Буква С в правом нижнем углу
+        c_label = tk.Label(
+            logo_square,
+            text="С",
+            font=("Arial", 28, "bold"),
+            bg="#E30611",
+            fg="#FFFFFF"
+        )
+        c_label.place(relx=1.0, rely=1.0, x=-32, y=-35)
 
         # Название приложения
         tk.Label(
@@ -1209,17 +1228,61 @@ class IVRCallerApp:
         )
         theme_btn.pack()
 
-        # Вкладки
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(10, 15))
+        # Навигационные кнопки-плиточки
+        nav_container = tk.Frame(self.root, bg=self.colors['bg'])
+        nav_container.pack(fill=tk.X, padx=20, pady=(15, 10))
 
-        self.constructor_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.constructor_frame, text="⚙ Конструктор")
+        # Переменная для отслеживания активной вкладки
+        self.current_tab = 'constructor'
+
+        # Кнопка "Конструктор"
+        self.constructor_btn = tk.Button(
+            nav_container,
+            text="⚙ Конструктор",
+            font=("Roboto", 14, "bold"),
+            bg=self.colors['primary'],
+            fg='#FFFFFF',
+            activebackground=self.colors['primary_hover'],
+            activeforeground='#FFFFFF',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=40,
+            pady=20,
+            command=lambda: self.switch_tab('constructor')
+        )
+        self.constructor_btn.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+
+        # Кнопка "История"
+        self.history_btn = tk.Button(
+            nav_container,
+            text="⏱ История",
+            font=("Roboto", 14, "bold"),
+            bg='#E0E0E0',
+            fg='#333333',
+            activebackground='#D0D0D0',
+            activeforeground='#333333',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=40,
+            pady=20,
+            command=lambda: self.switch_tab('history')
+        )
+        self.history_btn.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Контейнер для содержимого вкладок
+        self.tabs_container = tk.Frame(self.root, bg=self.colors['bg'])
+        self.tabs_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 15))
+
+        # Создаем фреймы для вкладок
+        self.constructor_frame = tk.Frame(self.tabs_container, bg=self.colors['bg'])
+        self.history_frame = tk.Frame(self.tabs_container, bg=self.colors['bg'])
+
+        # Настраиваем содержимое вкладок
         self.setup_constructor_tab()
-
-        self.history_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.history_frame, text="⏱ История")
         self.setup_history_tab()
+
+        # Показываем конструктор по умолчанию
+        self.constructor_frame.pack(fill=tk.BOTH, expand=True)
 
         # Статус-бар с границей
         status_border = tk.Frame(self.root, bg=self.colors['border'], height=1)
@@ -1238,6 +1301,77 @@ class IVRCallerApp:
             anchor=tk.W
         )
         self.status_label.pack(side=tk.LEFT, padx=20, pady=10)
+
+    def switch_tab(self, tab_name):
+        """Переключение между вкладками"""
+        if self.current_tab == tab_name:
+            return
+
+        self.current_tab = tab_name
+
+        # Скрываем все вкладки
+        self.constructor_frame.pack_forget()
+        self.history_frame.pack_forget()
+
+        # Обновляем стили кнопок
+        if tab_name == 'constructor':
+            # Активируем кнопку "Конструктор"
+            self.constructor_btn.config(
+                bg=self.colors['primary'],
+                fg='#FFFFFF',
+                activebackground=self.colors['primary_hover'],
+                activeforeground='#FFFFFF'
+            )
+            # Деактивируем кнопку "История"
+            self.history_btn.config(
+                bg='#E0E0E0',
+                fg='#333333',
+                activebackground='#D0D0D0',
+                activeforeground='#333333'
+            )
+            # Показываем конструктор
+            self.constructor_frame.pack(fill=tk.BOTH, expand=True)
+        else:
+            # Деактивируем кнопку "Конструктор"
+            self.constructor_btn.config(
+                bg='#E0E0E0',
+                fg='#333333',
+                activebackground='#D0D0D0',
+                activeforeground='#333333'
+            )
+            # Активируем кнопку "История"
+            self.history_btn.config(
+                bg=self.colors['primary'],
+                fg='#FFFFFF',
+                activebackground=self.colors['primary_hover'],
+                activeforeground='#FFFFFF'
+            )
+            # Показываем историю
+            self.history_frame.pack(fill=tk.BOTH, expand=True)
+
+    def select_alert_type(self, alert_key):
+        """Выбор типа оповещения"""
+        # Обновляем переменную
+        self.selected_alert_type.set(alert_key)
+
+        # Обновляем стили всех кнопок
+        for key, btn in self.alert_type_buttons.items():
+            if key == alert_key:
+                # Активная кнопка
+                btn.config(
+                    bg=self.colors['primary'],
+                    fg='#FFFFFF',
+                    activebackground=self.colors['primary_hover'],
+                    activeforeground='#FFFFFF'
+                )
+            else:
+                # Неактивная кнопка
+                btn.config(
+                    bg='#E0E0E0',
+                    fg='#333333',
+                    activebackground='#D0D0D0',
+                    activeforeground='#333333'
+                )
 
     def setup_constructor_tab(self):
         # Инициализация списка номеров
@@ -1275,24 +1409,33 @@ class IVRCallerApp:
         alert_buttons_frame = tk.Frame(alert_card, bg=self.colors['card_bg'])
         alert_buttons_frame.pack(fill=tk.X, pady=10)
 
+        # Сохраняем ссылки на кнопки для изменения стилей
+        self.alert_type_buttons = {}
+
         col_idx = 0
         for key, alert in ALERT_TYPES.items():
-            rb_frame = tk.Frame(alert_buttons_frame, bg=self.colors['card_bg'])
-            rb_frame.grid(row=0, column=col_idx, padx=15, pady=10, sticky=tk.W)
+            # Определяем начальный стиль (активная/неактивная)
+            is_selected = (key == self.selected_alert_type.get())
 
-            tk.Radiobutton(
-                rb_frame,
+            btn = tk.Button(
+                alert_buttons_frame,
                 text=alert["name"],
-                value=key,
-                variable=self.selected_alert_type,
-                font=("Roboto", 11),
-                bg=self.colors['card_bg'],
-                fg=self.colors['fg'],
-                selectcolor=self.colors['card_bg'],
-                activebackground=self.colors['card_bg'],
-                activeforeground=self.colors['primary'],
-                cursor="hand2"
-            ).pack()
+                font=("Roboto", 12, "bold"),
+                bg=self.colors['primary'] if is_selected else '#E0E0E0',
+                fg='#FFFFFF' if is_selected else '#333333',
+                activebackground=self.colors['primary_hover'] if is_selected else '#D0D0D0',
+                activeforeground='#FFFFFF' if is_selected else '#333333',
+                relief=tk.FLAT,
+                cursor="hand2",
+                padx=25,
+                pady=15,
+                command=lambda k=key: self.select_alert_type(k)
+            )
+            btn.grid(row=0, column=col_idx, padx=8, pady=5, sticky='ew')
+            alert_buttons_frame.grid_columnconfigure(col_idx, weight=1)
+
+            # Сохраняем ссылку на кнопку
+            self.alert_type_buttons[key] = btn
             col_idx += 1
 
         # Добавляем trace для отслеживания изменений типа оповещения
@@ -1332,8 +1475,10 @@ class IVRCallerApp:
             height=4,
             font=("Roboto", 11),
             wrap=tk.WORD,
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightcolor='#A0A0A0',
+            highlightthickness=1,
             padx=10,
             pady=8
         )
@@ -1392,8 +1537,10 @@ class IVRCallerApp:
             height=4,
             font=("Roboto", 11),
             wrap=tk.WORD,
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightcolor='#A0A0A0',
+            highlightthickness=1,
             padx=10,
             pady=8
         )
@@ -1451,8 +1598,9 @@ class IVRCallerApp:
             fg='#333333',
             activebackground='#D0D0D0',
             activeforeground='#333333',
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightthickness=1,
             cursor="hand2",
             padx=20,
             pady=10,
@@ -1467,8 +1615,9 @@ class IVRCallerApp:
             fg='#333333',
             activebackground='#D0D0D0',
             activeforeground='#333333',
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightthickness=1,
             cursor="hand2",
             padx=20,
             pady=10,
@@ -1493,8 +1642,10 @@ class IVRCallerApp:
             font=("Consolas", 10),
             selectmode=tk.EXTENDED,
             height=6,
-            relief=tk.SOLID,
-            borderwidth=1
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightcolor='#A0A0A0',
+            highlightthickness=1
         )
         scrollbar_list = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.phones_listbox.yview)
         self.phones_listbox.configure(yscrollcommand=scrollbar_list.set)
@@ -1652,8 +1803,10 @@ class IVRCallerApp:
             datetime_frame,
             textvariable=self.send_date,
             font=("Consolas", 11),
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightcolor='#A0A0A0',
+            highlightthickness=1,
             width=12
         )
         self.date_entry.pack(side=tk.LEFT, ipady=3, padx=(0, 20))
@@ -1672,8 +1825,10 @@ class IVRCallerApp:
             datetime_frame,
             textvariable=self.send_time,
             font=("Consolas", 11),
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightcolor='#A0A0A0',
+            highlightthickness=1,
             width=8
         )
         self.time_entry.pack(side=tk.LEFT, ipady=3)
@@ -2375,8 +2530,9 @@ class IVRCallerApp:
             fg='#333333',
             activebackground='#D0D0D0',
             activeforeground='#333333',
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightthickness=1,
             cursor="hand2",
             padx=30,
             pady=10,
@@ -2674,8 +2830,9 @@ class IVRCallerApp:
             fg='#333333',
             activebackground='#D0D0D0',
             activeforeground='#333333',
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightthickness=1,
             cursor="hand2",
             padx=30,
             pady=10,
@@ -2793,8 +2950,9 @@ class IVRCallerApp:
             fg='#333333',
             activebackground='#D0D0D0',
             activeforeground='#333333',
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightthickness=1,
             cursor="hand2",
             padx=30,
             pady=8,
