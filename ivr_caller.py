@@ -16,6 +16,7 @@ import ssl
 import re
 import configparser
 import http.cookiejar
+import random
 from datetime import datetime
 
 # Попытка импорта psycopg2
@@ -45,6 +46,35 @@ HISTORY_FILE = os.path.join(BASE_DIR, "campaigns_history.json")
 SAVED_VALUES_FILE = os.path.join(BASE_DIR, "saved_values.json")
 THEME_FILE = os.path.join(BASE_DIR, "theme.txt")
 # ===========================================
+
+
+# ============== АНИМАЦИЯ СНЕЖИНОК ==============
+class Snowflake:
+    """Класс для представления одной снежинки"""
+    def __init__(self, canvas_width, canvas_height):
+        self.x = random.randint(0, canvas_width)
+        self.y = random.randint(-canvas_height, 0)
+        self.size = random.randint(2, 5)
+        self.speed = random.uniform(0.5, 2.0)
+        self.drift = random.uniform(-0.5, 0.5)
+        self.canvas_height = canvas_height
+        self.canvas_width = canvas_width
+
+    def update(self):
+        """Обновление позиции снежинки"""
+        self.y += self.speed
+        self.x += self.drift
+
+        # Если снежинка вышла за границы, возвращаем её наверх
+        if self.y > self.canvas_height:
+            self.y = random.randint(-50, 0)
+            self.x = random.randint(0, self.canvas_width)
+
+        # Если снежинка ушла за боковую границу
+        if self.x < 0:
+            self.x = self.canvas_width
+        elif self.x > self.canvas_width:
+            self.x = 0
 
 
 # ============== ДИЗАЙН-СИСТЕМА МТС ==============
@@ -1087,8 +1117,16 @@ class IVRCallerApp:
         self.setup_ui()
         self.center_window()
 
+        # Инициализация снежинок
+        self.snowflakes = []
+        self.snowflake_items = []
+        self.setup_snowflakes()
+
         # Запускаем проверку отложенных кампаний
         self.root.after(5000, self.check_scheduled_campaigns)
+
+        # Запускаем анимацию снежинок
+        self.animate_snowflakes()
 
     def _load_connid(self):
         try:
@@ -1120,6 +1158,65 @@ class IVRCallerApp:
         x = (self.root.winfo_screenwidth() // 2) - (w // 2)
         y = (self.root.winfo_screenheight() // 2) - (h // 2)
         self.root.geometry(f"+{x}+{y}")
+
+    def setup_snowflakes(self):
+        """Создание Canvas для снежинок и инициализация снежинок"""
+        # Создаем прозрачный Canvas поверх всего окна
+        self.snow_canvas = tk.Canvas(
+            self.root,
+            bg=self.colors['bg'],
+            highlightthickness=0
+        )
+        self.snow_canvas.place(x=0, y=0, relwidth=1, relheight=1)
+        # Делаем Canvas прозрачным для кликов (события проходят насквозь)
+        self.snow_canvas.lower()
+
+        # Создаем 50 снежинок
+        width = self.root.winfo_width() or 850
+        height = self.root.winfo_height() or 700
+
+        for _ in range(50):
+            snowflake = Snowflake(width, height)
+            self.snowflakes.append(snowflake)
+            # Создаем графический элемент снежинки
+            item = self.snow_canvas.create_oval(
+                snowflake.x - snowflake.size,
+                snowflake.y - snowflake.size,
+                snowflake.x + snowflake.size,
+                snowflake.y + snowflake.size,
+                fill='white',
+                outline='white'
+            )
+            self.snowflake_items.append(item)
+
+    def animate_snowflakes(self):
+        """Анимация падения снежинок"""
+        try:
+            width = self.root.winfo_width()
+            height = self.root.winfo_height()
+
+            for i, snowflake in enumerate(self.snowflakes):
+                # Обновляем ширину и высоту canvas
+                snowflake.canvas_width = width
+                snowflake.canvas_height = height
+
+                # Обновляем позицию снежинки
+                snowflake.update()
+
+                # Перемещаем графический элемент
+                self.snow_canvas.coords(
+                    self.snowflake_items[i],
+                    snowflake.x - snowflake.size,
+                    snowflake.y - snowflake.size,
+                    snowflake.x + snowflake.size,
+                    snowflake.y + snowflake.size
+                )
+
+            # Продолжаем анимацию (60 FPS)
+            self.root.after(16, self.animate_snowflakes)
+        except tk.TclError:
+            # Окно закрыто, останавливаем анимацию
+            pass
 
     def create_card(self, parent, title=None, padx=20, pady=10):
         """Создает карточку с рамкой и отступами в стиле МТС"""
