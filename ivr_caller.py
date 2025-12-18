@@ -1120,13 +1120,13 @@ class IVRCallerApp:
         # Инициализация снежинок
         self.snowflakes = []
         self.snowflake_items = []
-        self.setup_snowflakes()
 
         # Запускаем проверку отложенных кампаний
         self.root.after(5000, self.check_scheduled_campaigns)
 
-        # Запускаем анимацию снежинок
-        self.animate_snowflakes()
+        # Создаем снежинки после того, как окно отрисовалось
+        self.root.after(100, self.setup_snowflakes)
+        self.root.after(150, self.animate_snowflakes)
 
     def _load_connid(self):
         try:
@@ -1192,6 +1192,10 @@ class IVRCallerApp:
     def animate_snowflakes(self):
         """Анимация падения снежинок"""
         try:
+            # Проверяем, что снежинки созданы
+            if not hasattr(self, 'snow_canvas') or not self.snowflakes:
+                return
+
             width = self.root.winfo_width()
             height = self.root.winfo_height()
 
@@ -1214,8 +1218,8 @@ class IVRCallerApp:
 
             # Продолжаем анимацию (60 FPS)
             self.root.after(16, self.animate_snowflakes)
-        except tk.TclError:
-            # Окно закрыто, останавливаем анимацию
+        except (tk.TclError, AttributeError):
+            # Окно закрыто или снежинки не созданы, останавливаем анимацию
             pass
 
     def create_card(self, parent, title=None, padx=20, pady=10):
