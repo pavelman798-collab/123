@@ -16,6 +16,7 @@ import ssl
 import re
 import configparser
 import http.cookiejar
+import random
 from datetime import datetime
 
 # Попытка импорта psycopg2
@@ -56,6 +57,35 @@ THEME_FILE = os.path.join(BASE_DIR, "theme.txt")
 # ===========================================
 
 
+# ============== АНИМАЦИЯ СНЕЖИНОК ==============
+class Snowflake:
+    """Класс для представления одной снежинки"""
+    def __init__(self, canvas_width, canvas_height):
+        self.x = random.randint(0, canvas_width)
+        self.y = random.randint(-canvas_height, 0)
+        self.size = random.randint(2, 5)
+        self.speed = random.uniform(0.5, 2.0)
+        self.drift = random.uniform(-0.5, 0.5)
+        self.canvas_height = canvas_height
+        self.canvas_width = canvas_width
+
+    def update(self):
+        """Обновление позиции снежинки"""
+        self.y += self.speed
+        self.x += self.drift
+
+        # Если снежинка вышла за границы, возвращаем её наверх
+        if self.y > self.canvas_height:
+            self.y = random.randint(-50, 0)
+            self.x = random.randint(0, self.canvas_width)
+
+        # Если снежинка ушла за боковую границу
+        if self.x < 0:
+            self.x = self.canvas_width
+        elif self.x > self.canvas_width:
+            self.x = 0
+
+
 # ============== ДИЗАЙН-СИСТЕМА МТС ==============
 class MTSTheme:
     """Управление темами оформления в стиле МТС"""
@@ -75,8 +105,8 @@ class MTSTheme:
         'error': '#DC3545',
         'text_muted': '#6C757D',
         'input_bg': '#FFFFFF',
-        'header_bg': '#E30611',
-        'header_fg': '#FFFFFF'
+        'header_bg': '#FFFFFF',
+        'header_fg': '#333333'
     }
 
     # Темная тема
@@ -94,8 +124,8 @@ class MTSTheme:
         'error': '#E74C3C',
         'text_muted': '#95A5A6',
         'input_bg': '#2D2D2D',
-        'header_bg': '#252525',
-        'header_fg': '#FFFFFF'
+        'header_bg': '#2D2D2D',
+        'header_fg': '#E0E0E0'
     }
 
     @staticmethod
@@ -187,7 +217,8 @@ class ToolTip:
         tw.wm_geometry(f"+{x}+{y}")
         label = tk.Label(
             tw, text=self.text, justify=tk.LEFT,
-            background="#FFFFCC", relief=tk.SOLID, borderwidth=1,
+            background="#FFFFCC", relief=tk.FLAT,
+            highlightbackground='#D0D0D0', highlightthickness=1,
             font=("Roboto", 9), padx=10, pady=5
         )
         label.pack()
@@ -1095,8 +1126,16 @@ class IVRCallerApp:
         self.setup_ui()
         self.center_window()
 
+        # Инициализация снежинок
+        self.snowflakes = []
+        self.snowflake_items = []
+
         # Запускаем проверку отложенных кампаний
         self.root.after(5000, self.check_scheduled_campaigns)
+
+        # Создаем снежинки после того, как окно отрисовалось
+        self.root.after(200, self.setup_snowflakes)
+        self.root.after(300, self.animate_snowflakes)
 
     def _load_connid(self):
         try:
@@ -1128,6 +1167,60 @@ class IVRCallerApp:
         x = (self.root.winfo_screenwidth() // 2) - (w // 2)
         y = (self.root.winfo_screenheight() // 2) - (h // 2)
         self.root.geometry(f"+{x}+{y}")
+
+    def setup_snowflakes(self):
+        """Создание снежинок как Label виджетов"""
+        # Получаем размеры окна
+        width = self.root.winfo_width() or 850
+        height = self.root.winfo_height() or 700
+
+        # Создаем 30 снежинок (меньше, чтобы не перегружать)
+        for _ in range(30):
+            snowflake = Snowflake(width, height)
+            self.snowflakes.append(snowflake)
+
+            # Создаем Label для снежинки
+            label = tk.Label(
+                self.root,
+                text='❄',  # Символ снежинки
+                fg='#87CEEB',  # Голубой цвет (Sky Blue)
+                bg=self.colors['bg'],
+                font=('Arial', snowflake.size)  # Уменьшен в 3 раза
+            )
+            # Размещаем снежинку
+            label.place(x=snowflake.x, y=snowflake.y)
+            # Делаем Label игнорирующим клики
+            label.configure(cursor='')
+            # Сохраняем ссылку
+            self.snowflake_items.append(label)
+
+    def animate_snowflakes(self):
+        """Анимация падения снежинок"""
+        try:
+            # Проверяем, что снежинки созданы
+            if not self.snowflakes or not self.snowflake_items:
+                return
+
+            width = self.root.winfo_width()
+            height = self.root.winfo_height()
+
+            for i, snowflake in enumerate(self.snowflakes):
+                # Обновляем ширину и высоту окна
+                snowflake.canvas_width = width
+                snowflake.canvas_height = height
+
+                # Обновляем позицию снежинки
+                snowflake.update()
+
+                # Перемещаем Label снежинки
+                label = self.snowflake_items[i]
+                label.place(x=int(snowflake.x), y=int(snowflake.y))
+
+            # Продолжаем анимацию (30 FPS для экономии ресурсов)
+            self.root.after(33, self.animate_snowflakes)
+        except (tk.TclError, AttributeError, IndexError):
+            # Окно закрыто или снежинки не созданы, останавливаем анимацию
+            pass
 
     def create_card(self, parent, title=None, padx=20, pady=10):
         """Создает карточку с рамкой и отступами в стиле МТС"""
@@ -1173,21 +1266,35 @@ class IVRCallerApp:
         header_frame.pack(fill=tk.X)
         header_frame.pack_propagate(False)
 
-        # Логотип МТС - красный квадрат с белым текстом
+        # Логотип МТС - загружается из файла
         logo_container = tk.Frame(header_frame, bg=self.colors['header_bg'])
         logo_container.pack(side=tk.LEFT, padx=20, pady=10)
 
-        # Красный квадрат с логотипом МТС
-        logo_label = tk.Label(
-            logo_container,
-            text="МТС",
-            font=("Arial", 24, "bold"),
-            bg="#E30611",
-            fg="#FFFFFF",
-            padx=12,
-            pady=8
-        )
-        logo_label.pack(side=tk.LEFT)
+        # Пытаемся загрузить логотип из файла
+        logo_path = os.path.join(BASE_DIR, "assets", "logo_mts.png")
+        print(f"🔍 Поиск логотипа: {logo_path}")
+        print(f"📁 Файл существует: {os.path.exists(logo_path)}")
+
+        if os.path.exists(logo_path):
+            try:
+                # Загружаем изображение
+                self.logo_image = tk.PhotoImage(file=logo_path)
+                # Изменяем размер до 50x50 (если нужно)
+                logo_label = tk.Label(
+                    logo_container,
+                    image=self.logo_image,
+                    bg=self.colors['header_bg']
+                )
+                logo_label.pack(side=tk.LEFT)
+                print(f"✅ Логотип загружен успешно!")
+            except Exception as e:
+                # Если не удалось загрузить, показываем заглушку
+                print(f"❌ Ошибка загрузки логотипа: {e}")
+                self._create_logo_placeholder(logo_container, logo_path)
+        else:
+            # Файл не найден - показываем заглушку с инструкцией
+            print(f"❌ Файл не найден: {logo_path}")
+            self._create_logo_placeholder(logo_container, logo_path)
 
         # Название приложения
         tk.Label(
@@ -1198,10 +1305,29 @@ class IVRCallerApp:
             fg=self.colors['header_fg']
         ).pack(side=tk.LEFT, padx=(12, 0))
 
-        # Переключатель темы
+        # Переключатель темы и снежинок
         theme_frame = tk.Frame(header_frame, bg=self.colors['header_bg'])
         theme_frame.pack(side=tk.RIGHT, padx=20)
 
+        # Кнопка снежинок
+        self.snowflakes_enabled = True
+        self.snow_btn = tk.Button(
+            theme_frame,
+            text="❄ Снежинки",
+            font=("Roboto", 10),
+            bg=self.colors['header_bg'],
+            fg=self.colors['header_fg'],
+            activebackground=self.colors['primary_hover'],
+            activeforeground=self.colors['header_fg'],
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8,
+            command=self.toggle_snowflakes
+        )
+        self.snow_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        # Кнопка смены темы
         theme_btn = tk.Button(
             theme_frame,
             text="◐ Сменить тему",
@@ -1216,19 +1342,63 @@ class IVRCallerApp:
             pady=8,
             command=self.toggle_theme
         )
-        theme_btn.pack()
+        theme_btn.pack(side=tk.LEFT)
 
-        # Вкладки
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(10, 15))
+        # Навигационные кнопки-плиточки
+        nav_container = tk.Frame(self.root, bg=self.colors['bg'])
+        nav_container.pack(fill=tk.X, padx=20, pady=(15, 10))
 
-        self.constructor_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.constructor_frame, text="⚙ Конструктор")
+        # Переменная для отслеживания активной вкладки
+        self.current_tab = 'constructor'
+
+        # Кнопка "Конструктор"
+        self.constructor_btn = tk.Button(
+            nav_container,
+            text="⚙ Конструктор",
+            font=("Roboto", 14, "bold"),
+            bg=self.colors['primary'],
+            fg='#FFFFFF',
+            activebackground=self.colors['primary_hover'],
+            activeforeground='#FFFFFF',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=40,
+            pady=20,
+            command=lambda: self.switch_tab('constructor')
+        )
+        self.constructor_btn.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+
+        # Кнопка "История"
+        self.history_btn = tk.Button(
+            nav_container,
+            text="⏱ История",
+            font=("Roboto", 14, "bold"),
+            bg='#E0E0E0',
+            fg='#333333',
+            activebackground='#D0D0D0',
+            activeforeground='#333333',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=40,
+            pady=20,
+            command=lambda: self.switch_tab('history')
+        )
+        self.history_btn.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Контейнер для содержимого вкладок
+        self.tabs_container = tk.Frame(self.root, bg=self.colors['bg'])
+        self.tabs_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 15))
+
+        # Создаем фреймы для вкладок
+        self.constructor_frame = tk.Frame(self.tabs_container, bg=self.colors['bg'])
+        self.history_frame = tk.Frame(self.tabs_container, bg=self.colors['bg'])
+
+        # Настраиваем содержимое вкладок
         self.setup_constructor_tab()
-
-        self.history_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.history_frame, text="⏱ История")
         self.setup_history_tab()
+
+        # Показываем конструктор по умолчанию
+        self.constructor_frame.pack(fill=tk.BOTH, expand=True)
 
         # Статус-бар с границей
         status_border = tk.Frame(self.root, bg=self.colors['border'], height=1)
@@ -1247,6 +1417,124 @@ class IVRCallerApp:
             anchor=tk.W
         )
         self.status_label.pack(side=tk.LEFT, padx=20, pady=10)
+
+    def switch_tab(self, tab_name):
+        """Переключение между вкладками"""
+        if self.current_tab == tab_name:
+            return
+
+        self.current_tab = tab_name
+
+        # Скрываем все вкладки
+        self.constructor_frame.pack_forget()
+        self.history_frame.pack_forget()
+
+        # Обновляем стили кнопок
+        if tab_name == 'constructor':
+            # Активируем кнопку "Конструктор"
+            self.constructor_btn.config(
+                bg=self.colors['primary'],
+                fg='#FFFFFF',
+                activebackground=self.colors['primary_hover'],
+                activeforeground='#FFFFFF'
+            )
+            # Деактивируем кнопку "История"
+            self.history_btn.config(
+                bg='#E0E0E0',
+                fg='#333333',
+                activebackground='#D0D0D0',
+                activeforeground='#333333'
+            )
+            # Показываем конструктор
+            self.constructor_frame.pack(fill=tk.BOTH, expand=True)
+        else:
+            # Деактивируем кнопку "Конструктор"
+            self.constructor_btn.config(
+                bg='#E0E0E0',
+                fg='#333333',
+                activebackground='#D0D0D0',
+                activeforeground='#333333'
+            )
+            # Активируем кнопку "История"
+            self.history_btn.config(
+                bg=self.colors['primary'],
+                fg='#FFFFFF',
+                activebackground=self.colors['primary_hover'],
+                activeforeground='#FFFFFF'
+            )
+            # Показываем историю
+            self.history_frame.pack(fill=tk.BOTH, expand=True)
+
+    def select_alert_type(self, alert_key):
+        """Выбор типа оповещения"""
+        # Обновляем переменную
+        self.selected_alert_type.set(alert_key)
+
+        # Обновляем стили всех кнопок
+        for key, btn in self.alert_type_buttons.items():
+            if key == alert_key:
+                # Активная кнопка
+                btn.config(
+                    bg=self.colors['primary'],
+                    fg='#FFFFFF',
+                    activebackground=self.colors['primary_hover'],
+                    activeforeground='#FFFFFF'
+                )
+            else:
+                # Неактивная кнопка
+                btn.config(
+                    bg='#E0E0E0',
+                    fg='#333333',
+                    activebackground='#D0D0D0',
+                    activeforeground='#333333'
+                )
+
+    def switch_history_tab(self, tab_name):
+        """Переключение между подвкладками истории"""
+        if self.current_history_tab == tab_name:
+            return
+
+        self.current_history_tab = tab_name
+
+        # Скрываем все подвкладки
+        self.queued_frame.pack_forget()
+        self.completed_frame.pack_forget()
+
+        # Обновляем стили кнопок
+        if tab_name == 'queued':
+            # Активируем кнопку "В очереди"
+            self.queued_btn.config(
+                bg=self.colors['primary'],
+                fg='#FFFFFF',
+                activebackground=self.colors['primary_hover'],
+                activeforeground='#FFFFFF'
+            )
+            # Деактивируем кнопку "Завершенные"
+            self.completed_btn.config(
+                bg='#E0E0E0',
+                fg='#333333',
+                activebackground='#D0D0D0',
+                activeforeground='#333333'
+            )
+            # Показываем "В очереди"
+            self.queued_frame.pack(fill=tk.BOTH, expand=True)
+        else:
+            # Деактивируем кнопку "В очереди"
+            self.queued_btn.config(
+                bg='#E0E0E0',
+                fg='#333333',
+                activebackground='#D0D0D0',
+                activeforeground='#333333'
+            )
+            # Активируем кнопку "Завершенные"
+            self.completed_btn.config(
+                bg=self.colors['primary'],
+                fg='#FFFFFF',
+                activebackground=self.colors['primary_hover'],
+                activeforeground='#FFFFFF'
+            )
+            # Показываем "Завершенные"
+            self.completed_frame.pack(fill=tk.BOTH, expand=True)
 
     def setup_constructor_tab(self):
         # Инициализация списка номеров
@@ -1284,24 +1572,33 @@ class IVRCallerApp:
         alert_buttons_frame = tk.Frame(alert_card, bg=self.colors['card_bg'])
         alert_buttons_frame.pack(fill=tk.X, pady=10)
 
+        # Сохраняем ссылки на кнопки для изменения стилей
+        self.alert_type_buttons = {}
+
         col_idx = 0
         for key, alert in ALERT_TYPES.items():
-            rb_frame = tk.Frame(alert_buttons_frame, bg=self.colors['card_bg'])
-            rb_frame.grid(row=0, column=col_idx, padx=15, pady=10, sticky=tk.W)
+            # Определяем начальный стиль (активная/неактивная)
+            is_selected = (key == self.selected_alert_type.get())
 
-            tk.Radiobutton(
-                rb_frame,
+            btn = tk.Button(
+                alert_buttons_frame,
                 text=alert["name"],
-                value=key,
-                variable=self.selected_alert_type,
-                font=("Roboto", 11),
-                bg=self.colors['card_bg'],
-                fg=self.colors['fg'],
-                selectcolor=self.colors['card_bg'],
-                activebackground=self.colors['card_bg'],
-                activeforeground=self.colors['primary'],
-                cursor="hand2"
-            ).pack()
+                font=("Roboto", 12, "bold"),
+                bg=self.colors['primary'] if is_selected else '#E0E0E0',
+                fg='#FFFFFF' if is_selected else '#333333',
+                activebackground=self.colors['primary_hover'] if is_selected else '#D0D0D0',
+                activeforeground='#FFFFFF' if is_selected else '#333333',
+                relief=tk.FLAT,
+                cursor="hand2",
+                padx=25,
+                pady=15,
+                command=lambda k=key: self.select_alert_type(k)
+            )
+            btn.grid(row=0, column=col_idx, padx=8, pady=5, sticky='ew')
+            alert_buttons_frame.grid_columnconfigure(col_idx, weight=1)
+
+            # Сохраняем ссылку на кнопку
+            self.alert_type_buttons[key] = btn
             col_idx += 1
 
         # Добавляем trace для отслеживания изменений типа оповещения
@@ -1341,8 +1638,10 @@ class IVRCallerApp:
             height=4,
             font=("Roboto", 11),
             wrap=tk.WORD,
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightcolor='#A0A0A0',
+            highlightthickness=1,
             padx=10,
             pady=8
         )
@@ -1401,8 +1700,10 @@ class IVRCallerApp:
             height=4,
             font=("Roboto", 11),
             wrap=tk.WORD,
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightcolor='#A0A0A0',
+            highlightthickness=1,
             padx=10,
             pady=8
         )
@@ -1460,8 +1761,9 @@ class IVRCallerApp:
             fg='#333333',
             activebackground='#D0D0D0',
             activeforeground='#333333',
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightthickness=1,
             cursor="hand2",
             padx=20,
             pady=10,
@@ -1476,8 +1778,9 @@ class IVRCallerApp:
             fg='#333333',
             activebackground='#D0D0D0',
             activeforeground='#333333',
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightthickness=1,
             cursor="hand2",
             padx=20,
             pady=10,
@@ -1502,8 +1805,10 @@ class IVRCallerApp:
             font=("Consolas", 10),
             selectmode=tk.EXTENDED,
             height=6,
-            relief=tk.SOLID,
-            borderwidth=1
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightcolor='#A0A0A0',
+            highlightthickness=1
         )
         scrollbar_list = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.phones_listbox.yview)
         self.phones_listbox.configure(yscrollcommand=scrollbar_list.set)
@@ -1661,8 +1966,10 @@ class IVRCallerApp:
             datetime_frame,
             textvariable=self.send_date,
             font=("Consolas", 11),
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightcolor='#A0A0A0',
+            highlightthickness=1,
             width=12
         )
         self.date_entry.pack(side=tk.LEFT, ipady=3, padx=(0, 20))
@@ -1681,8 +1988,10 @@ class IVRCallerApp:
             datetime_frame,
             textvariable=self.send_time,
             font=("Consolas", 11),
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightcolor='#A0A0A0',
+            highlightthickness=1,
             width=8
         )
         self.time_entry.pack(side=tk.LEFT, ipady=3)
@@ -1844,19 +2153,61 @@ class IVRCallerApp:
 
     def setup_history_tab(self):
         """Вкладка истории кампаний"""
-        # Создаем подвкладки для истории
-        self.history_notebook = ttk.Notebook(self.history_frame)
-        self.history_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Навигационные кнопки для подвкладок
+        history_nav_container = tk.Frame(self.history_frame, bg=self.colors['bg'])
+        history_nav_container.pack(fill=tk.X, padx=10, pady=(10, 10))
 
-        # Подвкладка "В очереди"
-        self.queued_frame = ttk.Frame(self.history_notebook)
-        self.history_notebook.add(self.queued_frame, text="⏳ В очереди")
+        # Переменная для отслеживания активной подвкладки
+        self.current_history_tab = 'queued'
+
+        # Кнопка "В очереди"
+        self.queued_btn = tk.Button(
+            history_nav_container,
+            text="⏳ В очереди",
+            font=("Roboto", 11, "bold"),
+            bg=self.colors['primary'],
+            fg='#FFFFFF',
+            activebackground=self.colors['primary_hover'],
+            activeforeground='#FFFFFF',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=25,
+            pady=12,
+            command=lambda: self.switch_history_tab('queued')
+        )
+        self.queued_btn.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
+
+        # Кнопка "Завершенные"
+        self.completed_btn = tk.Button(
+            history_nav_container,
+            text="✅ Завершенные",
+            font=("Roboto", 11, "bold"),
+            bg='#E0E0E0',
+            fg='#333333',
+            activebackground='#D0D0D0',
+            activeforeground='#333333',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=25,
+            pady=12,
+            command=lambda: self.switch_history_tab('completed')
+        )
+        self.completed_btn.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Контейнер для содержимого подвкладок
+        self.history_tabs_container = tk.Frame(self.history_frame, bg=self.colors['bg'])
+        self.history_tabs_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        # Создаем фреймы для подвкладок
+        self.queued_frame = tk.Frame(self.history_tabs_container, bg=self.colors['bg'])
+        self.completed_frame = tk.Frame(self.history_tabs_container, bg=self.colors['bg'])
+
+        # Настраиваем содержимое подвкладок
         self.setup_queued_tab()
-
-        # Подвкладка "Завершенные"
-        self.completed_frame = ttk.Frame(self.history_notebook)
-        self.history_notebook.add(self.completed_frame, text="✅ Завершенные")
         self.setup_completed_tab()
+
+        # Показываем "В очереди" по умолчанию
+        self.queued_frame.pack(fill=tk.BOTH, expand=True)
 
     def setup_queued_tab(self):
         """Подвкладка с кампаниями в очереди"""
@@ -2405,8 +2756,9 @@ class IVRCallerApp:
             fg='#333333',
             activebackground='#D0D0D0',
             activeforeground='#333333',
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightthickness=1,
             cursor="hand2",
             padx=30,
             pady=10,
@@ -2748,8 +3100,9 @@ class IVRCallerApp:
             fg='#333333',
             activebackground='#D0D0D0',
             activeforeground='#333333',
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightthickness=1,
             cursor="hand2",
             padx=30,
             pady=10,
@@ -2993,8 +3346,9 @@ class IVRCallerApp:
             fg='#333333',
             activebackground='#D0D0D0',
             activeforeground='#333333',
-            relief=tk.SOLID,
-            borderwidth=1,
+            relief=tk.FLAT,
+            highlightbackground='#D0D0D0',
+            highlightthickness=1,
             cursor="hand2",
             padx=30,
             pady=8,
@@ -3799,6 +4153,48 @@ class IVRCallerApp:
             f"Тема изменена на {'темную' if new_theme == 'dark' else 'светлую'}!\n\n"
             f"Перезапустите приложение для применения изменений."
         )
+
+    def toggle_snowflakes(self):
+        """Включение/выключение анимации снежинок"""
+        self.snowflakes_enabled = not self.snowflakes_enabled
+
+        if self.snowflakes_enabled:
+            # Включаем снежинки
+            self.snow_btn.config(text="❄ Снежинки")
+            # Создаем снежинки если их нет
+            if not self.snowflakes:
+                self.setup_snowflakes()
+            # Показываем все снежинки
+            for label in self.snowflake_items:
+                label.place_configure()
+        else:
+            # Выключаем снежинки
+            self.snow_btn.config(text="❄ Снежинки (выкл)")
+            # Скрываем все снежинки
+            for label in self.snowflake_items:
+                label.place_forget()
+
+    def _create_logo_placeholder(self, container, logo_path=None):
+        """Создает заглушку для логотипа когда файл не найден"""
+        # Красный квадрат с текстом "LOGO"
+        placeholder = tk.Label(
+            container,
+            text="LOGO\n50x50",
+            font=("Arial", 8, "bold"),
+            bg="#E30611",
+            fg="#FFFFFF",
+            width=7,
+            height=3,
+            relief=tk.SOLID,
+            borderwidth=1
+        )
+        placeholder.pack(side=tk.LEFT)
+
+        # Добавляем подсказку с путем к файлу
+        tooltip_text = "Поместите logo_mts.png в папку assets/\nРазмер: 50x50 пикселей"
+        if logo_path:
+            tooltip_text += f"\n\nОжидаемый путь:\n{logo_path}"
+        ToolTip(placeholder, tooltip_text)
 
     def get_dashboard_metrics(self):
         """Получение метрик для Dashboard"""
