@@ -35,6 +35,15 @@ except ImportError:
     HAS_PARAMIKO = False
     print("⚠️ paramiko не установлен. Подключение к лог-серверу недоступно.")
 
+# Попытка импорта openpyxl для Excel
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    HAS_OPENPYXL = True
+except ImportError:
+    HAS_OPENPYXL = False
+    print("⚠️ openpyxl не установлен. Экспорт в Excel недоступен.")
+
 
 # ============== ПУТИ К ФАЙЛАМ ==============
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -2479,6 +2488,27 @@ class IVRCallerApp:
         except:
             pass  # Если вкладки еще не созданы
 
+    def update_campaign_in_history(self, campaign_data):
+        """Обновление существующей кампании в истории"""
+        history = self.load_history()
+        campaign_id = campaign_data.get('id')
+
+        if campaign_id:
+            # Находим и обновляем кампанию
+            for i, campaign in enumerate(history):
+                if campaign.get('id') == campaign_id:
+                    history[i] = campaign_data
+                    break
+
+            self.save_history(history)
+
+            # Обновляем обе вкладки
+            try:
+                self.refresh_queued_history()
+                self.refresh_completed_history()
+            except:
+                pass  # Если вкладки еще не созданы
+
     def delete_queued_campaign(self):
         """Удаление кампании из очереди"""
         selection = self.queued_tree.selection()
@@ -2760,6 +2790,26 @@ class IVRCallerApp:
             messagebox.showerror("Ошибка", "Кампания не найдена в истории")
             return
 
+        # Проверяем, есть ли сохраненные результаты проверки доставки
+        if 'delivery_check_result' in campaign and campaign['delivery_check_result']:
+            # Есть сохраненные результаты - показываем диалог с выбором
+            timestamp = campaign.get('delivery_check_timestamp', 'неизвестно')
+            choice = messagebox.askyesnocancel(
+                "Результаты проверки доставки",
+                f"Для этой кампании уже есть сохраненные результаты проверки доставки от {timestamp}.\n\n"
+                "Нажмите:\n"
+                "• Да - Открыть сохраненные результаты\n"
+                "• Нет - Провести новую проверку доставки\n"
+                "• Отмена - Закрыть это окно"
+            )
+
+            if choice is None:  # Отмена
+                return
+            elif choice:  # Да - показать сохраненные результаты
+                self.show_delivery_results(campaign['delivery_check_result'], campaign)
+                return
+            # Нет - продолжить с новой проверкой (код ниже)
+
         # Вызываем проверку доставки
         self.check_campaign_delivery_ui(campaign)
 
@@ -2867,6 +2917,13 @@ class IVRCallerApp:
             if not result['success']:
                 messagebox.showerror("Ошибка", f"Ошибка при проверке доставки:\n{result.get('error', 'Неизвестная ошибка')}")
                 return
+
+            # Сохраняем результаты в кампанию с меткой времени
+            campaign['delivery_check_result'] = result
+            campaign['delivery_check_timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            # Обновляем кампанию в истории
+            self.update_campaign_in_history(campaign)
 
             # Показываем результаты
             self.show_delivery_results(result, campaign)
@@ -3017,6 +3074,23 @@ class IVRCallerApp:
         )
         recheck_btn.pack(side=tk.LEFT, padx=5)
 
+        # Кнопка экспорта в Excel
+        export_btn = tk.Button(
+            btn_frame,
+            text="📊 Выгрузить в Excel",
+            font=("Roboto", 11, "bold"),
+            bg='#28A745',
+            fg='white',
+            activebackground='#218838',
+            activeforeground='white',
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=20,
+            pady=10,
+            command=lambda: self.export_delivery_to_excel(result, campaign)
+        )
+        export_btn.pack(side=tk.LEFT, padx=5)
+
         # Кнопка закрытия
         close_btn = tk.Button(
             btn_frame,
@@ -3040,6 +3114,132 @@ class IVRCallerApp:
         """Повторная проверка доставки из окна результатов"""
         results_window.destroy()  # Закрываем текущее окно результатов
         self.check_campaign_delivery_ui(campaign)  # Запускаем проверку заново
+
+    def export_delivery_to_excel(self, result, campaign):
+        """Экспорт результатов проверки доставки в Excel"""
+        if not HAS_OPENPYXL:
+            messagebox.showerror(
+                "Ошибка",
+                "Библиотека openpyxl не установлена.\n\n"
+                "Установите её командой:\n"
+                "pip install openpyxl"
+            )
+            return
+
+        try:
+            from tkinter import filedialog
+
+            # Генерируем имя файла по умолчанию
+            campaign_name = campaign.get('alert_type', 'кампания')
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            default_filename = f"delivery_results_{campaign_name}_{timestamp}.xlsx"
+
+            # Открываем диалог сохранения файла
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".xlsx",
+                filetypes=[("Excel файлы", "*.xlsx"), ("Все файлы", "*.*")],
+                initialfile=default_filename
+            )
+
+            if not file_path:
+                return  # Пользователь отменил сохранение
+
+            # Создаем новую книгу Excel
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Результаты проверки доставки"
+
+            # Настройка стилей
+            header_font = Font(bold=True, size=12, color="FFFFFF")
+            header_fill = PatternFill(start_color="E30611", end_color="E30611", fill_type="solid")
+            center_alignment = Alignment(horizontal="center", vertical="center")
+
+            # Заголовок таблицы
+            ws.append([f"Результаты проверки доставки: {campaign_name}"])
+            ws.merge_cells('A1:D1')
+            ws['A1'].font = Font(bold=True, size=14)
+            ws['A1'].alignment = center_alignment
+
+            # Статистика
+            total = result.get('total', 0)
+            delivered = result.get('delivered', 0)
+            failed = result.get('failed', 0)
+            delivery_rate = (delivered / total * 100) if total > 0 else 0
+
+            ws.append([])  # Пустая строка
+            ws.append([f"Всего номеров: {total}"])
+            ws.append([f"Отвечено: {delivered} ({delivery_rate:.1f}%)"])
+            ws.append([f"Не отвечено: {failed}"])
+
+            # Метка времени проверки
+            check_timestamp = campaign.get('delivery_check_timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            ws.append([f"Время проверки: {check_timestamp}"])
+
+            ws.append([])  # Пустая строка
+
+            # Заголовки колонок
+            headers = ["Телефонный номер", "CONNID", "Статус", "Дата и время ответа"]
+            ws.append(headers)
+
+            # Применяем стили к заголовкам
+            header_row = ws.max_row
+            for col in range(1, 5):
+                cell = ws.cell(row=header_row, column=col)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = center_alignment
+
+            # Получаем данные
+            details = result.get('details', {})
+            phones_data = campaign.get('phones_data', [])
+
+            # Создаем словарь номер -> CONNID
+            phone_to_connid = {}
+            for phone_info in phones_data:
+                phone_num = phone_info.get('number', '')
+                connid = phone_info.get('connid', '')
+                if phone_num:
+                    phone_to_connid[phone_num] = connid
+
+            # Заполняем данными
+            for phone, info in details.items():
+                connid = phone_to_connid.get(phone, 'не указан')
+
+                if info['count'] > 0 and info['entries']:
+                    # Есть ответ
+                    first_entry = info['entries'][0]
+                    status = "Отвечен"
+                    datetime_str = first_entry.get('START_CALL_TIME', 'нет данных')
+                else:
+                    # Нет ответа
+                    status = "Не отвечен"
+                    datetime_str = "-"
+
+                ws.append([phone, connid, status, datetime_str])
+
+            # Автоматическая ширина колонок
+            for col in ws.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                ws.column_dimensions[column].width = adjusted_width
+
+            # Сохраняем файл
+            wb.save(file_path)
+
+            messagebox.showinfo(
+                "Успешно",
+                f"Результаты экспортированы в файл:\n{file_path}"
+            )
+
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Ошибка при экспорте в Excel:\n{str(e)}")
 
     def show_log_entry_details(self, event, tree, result):
         """Отображение полного ответа с лог-сервера по двойному клику"""
