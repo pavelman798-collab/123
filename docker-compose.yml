@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # Asterisk PBX для работы с GoIP-4
   asterisk:
-    image: andrius/asterisk:20-current
+    image: asterisk/asterisk:20
     container_name: phone-asterisk
     restart: unless-stopped
     ports:
