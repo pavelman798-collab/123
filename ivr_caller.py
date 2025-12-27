@@ -3218,17 +3218,17 @@ class IVRCallerApp:
                 ws.append([phone, connid, status, datetime_str])
 
             # Автоматическая ширина колонок
-            for col in ws.columns:
+            from openpyxl.utils import get_column_letter
+            for i, col in enumerate(ws.columns, 1):
                 max_length = 0
-                column = col[0].column_letter
                 for cell in col:
                     try:
-                        if len(str(cell.value)) > max_length:
+                        if cell.value and len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
                     except:
                         pass
                 adjusted_width = min(max_length + 2, 50)
-                ws.column_dimensions[column].width = adjusted_width
+                ws.column_dimensions[get_column_letter(i)].width = adjusted_width
 
             # Сохраняем файл
             wb.save(file_path)
