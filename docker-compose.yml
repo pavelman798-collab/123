@@ -1,7 +1,7 @@
 services:
   # Asterisk PBX для работы с GoIP-4
   asterisk:
-    image: asterisk/asterisk:20
+    build: ./docker/asterisk
     container_name: phone-asterisk
     restart: unless-stopped
     ports:
