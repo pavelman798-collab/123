@@ -5,6 +5,8 @@ Campaign Manager - API для управления телефонными кам
 """
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import psycopg2
@@ -18,6 +20,9 @@ from datetime import datetime
 import random
 
 app = FastAPI(title="Phone Campaign Manager API")
+
+# Монтируем статические файлы
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Конфигурация
 DB_CONFIG = {
@@ -99,6 +104,12 @@ async def make_call_via_ami(phone_number: str, audio_file: Optional[str] = None)
 
 @app.get("/")
 async def root():
+    """Редирект на веб-интерфейс"""
+    return RedirectResponse(url="/static/index.html")
+
+
+@app.get("/api")
+async def api_root():
     """Статус API"""
     return {
         "service": "Phone Campaign Manager",
@@ -107,7 +118,7 @@ async def root():
     }
 
 
-@app.get("/campaigns")
+@app.get("/api/campaigns")
 async def list_campaigns():
     """Список всех кампаний"""
     conn = get_db()
@@ -129,7 +140,7 @@ async def list_campaigns():
     return {"campaigns": campaigns}
 
 
-@app.post("/campaigns")
+@app.post("/api/campaigns")
 async def create_campaign(campaign: Campaign):
     """Создать новую кампанию"""
     conn = get_db()
@@ -150,7 +161,7 @@ async def create_campaign(campaign: Campaign):
     return {"campaign_id": campaign_id, "status": "created"}
 
 
-@app.post("/campaigns/{campaign_id}/numbers")
+@app.post("/api/campaigns/{campaign_id}/numbers")
 async def add_numbers(campaign_id: int, file: UploadFile = File(...)):
     """
     Загрузить список номеров из CSV файла
@@ -201,7 +212,7 @@ async def add_numbers(campaign_id: int, file: UploadFile = File(...)):
     }
 
 
-@app.post("/campaigns/{campaign_id}/start")
+@app.post("/api/campaigns/{campaign_id}/start")
 async def start_campaign(campaign_id: int):
     """Запустить кампанию"""
     conn = get_db()
@@ -224,7 +235,7 @@ async def start_campaign(campaign_id: int):
     return {"campaign_id": campaign_id, "status": "started"}
 
 
-@app.post("/campaigns/{campaign_id}/pause")
+@app.post("/api/campaigns/{campaign_id}/pause")
 async def pause_campaign(campaign_id: int):
     """Приостановить кампанию"""
     conn = get_db()
@@ -243,7 +254,7 @@ async def pause_campaign(campaign_id: int):
     return {"campaign_id": campaign_id, "status": "paused"}
 
 
-@app.get("/campaigns/{campaign_id}/stats")
+@app.get("/api/campaigns/{campaign_id}/stats")
 async def get_campaign_stats(campaign_id: int):
     """Статистика кампании"""
     conn = get_db()
@@ -278,7 +289,7 @@ async def get_campaign_stats(campaign_id: int):
     return stats
 
 
-@app.post("/call")
+@app.post("/api/call")
 async def make_call(call: CallRequest):
     """Выполнить один звонок"""
     result = await make_call_via_ami(call.phone_number, call.audio_file)
@@ -289,7 +300,7 @@ async def make_call(call: CallRequest):
         raise HTTPException(status_code=500, detail=result['error'])
 
 
-@app.get("/sims")
+@app.get("/api/sims")
 async def get_sims_status():
     """Статус всех SIM-карт"""
     conn = get_db()
