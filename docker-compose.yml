@@ -45,6 +45,7 @@ services:
     depends_on:
       - asterisk
       - postgres
+      - tts-service
     ports:
       - "8000:8000"  # API для управления
     volumes:
@@ -59,6 +60,21 @@ services:
       - ASTERISK_AMI_PORT=5038
       - ASTERISK_AMI_USER=admin
       - ASTERISK_AMI_SECRET=asterisk_secret
+      - TTS_SERVICE_URL=http://tts-service:5000
+      - TZ=Europe/Moscow
+
+  # Piper TTS - Генерация голосовых сообщений
+  tts-service:
+    build: ./docker/tts
+    container_name: phone-tts
+    restart: unless-stopped
+    ports:
+      - "5000:5000"  # TTS API
+    volumes:
+      - ./audio:/audio
+    networks:
+      - phone-network
+    environment:
       - TZ=Europe/Moscow
 
 networks:

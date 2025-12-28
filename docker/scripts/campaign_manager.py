@@ -18,6 +18,7 @@ import io
 import os
 from datetime import datetime
 import random
+import httpx
 
 app = FastAPI(title="Phone Campaign Manager API")
 
@@ -39,6 +40,8 @@ AMI_CONFIG = {
     'secret': os.getenv('ASTERISK_AMI_SECRET', 'asterisk_secret')
 }
 
+TTS_SERVICE_URL = os.getenv('TTS_SERVICE_URL', 'http://tts-service:5000')
+
 
 # ============== MODELS ==============
 
@@ -56,6 +59,11 @@ class CampaignNumbers(BaseModel):
 class CallRequest(BaseModel):
     phone_number: str
     audio_file: Optional[str] = None
+
+
+class TTSRequest(BaseModel):
+    text: str
+    filename: Optional[str] = None
 
 
 # ============== DATABASE ==============
@@ -320,6 +328,100 @@ async def get_sims_status():
     conn.close()
 
     return {"sims": sims}
+
+
+# ============== TTS ENDPOINTS ==============
+
+@app.post("/api/tts/generate")
+async def generate_tts(request: TTSRequest):
+    """
+    Генерирует голосовое сообщение из текста через TTS сервис
+
+    POST /api/tts/generate
+    {
+        "text": "Привет, это тестовое сообщение",
+        "filename": "message.wav"
+    }
+    """
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{TTS_SERVICE_URL}/api/tts/generate",
+                json={
+                    "text": request.text,
+                    "filename": request.filename
+                }
+            )
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"TTS service error: {response.text}"
+                )
+
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"TTS service unavailable: {str(e)}"
+        )
+
+
+@app.get("/api/tts/files")
+async def list_tts_files():
+    """
+    Список всех сгенерированных аудио файлов
+
+    GET /api/tts/files
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{TTS_SERVICE_URL}/api/tts/files")
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail="Failed to get file list"
+                )
+
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"TTS service unavailable: {str(e)}"
+        )
+
+
+@app.get("/api/tts/health")
+async def check_tts_health():
+    """
+    Проверить доступность TTS сервиса
+
+    GET /api/tts/health
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{TTS_SERVICE_URL}/health")
+
+            if response.status_code == 200:
+                data = response.json()
+                data['url'] = TTS_SERVICE_URL
+                return data
+            else:
+                return {
+                    "status": "unhealthy",
+                    "url": TTS_SERVICE_URL,
+                    "error": response.text
+                }
+
+    except httpx.RequestError as e:
+        return {
+            "status": "unavailable",
+            "url": TTS_SERVICE_URL,
+            "error": str(e)
+        }
 
 
 # ============== BACKGROUND TASKS ==============

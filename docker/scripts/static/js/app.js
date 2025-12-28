@@ -61,6 +61,9 @@ function showSection(sectionName) {
         case 'campaigns':
             loadCampaigns();
             break;
+        case 'tts':
+            loadTTSFiles();
+            break;
         case 'sims':
             loadSimCards();
             break;
@@ -413,6 +416,160 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification(error.message, 'danger');
         }
     });
+});
+
+// ============================================
+// TTS - Генератор голоса
+// ============================================
+
+async function loadTTSFiles() {
+    try {
+        const response = await fetch(`${API_BASE}/tts/files`);
+        const data = await response.json();
+
+        const container = document.getElementById('ttsFilesList');
+
+        if (data.total === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted py-3">
+                    <i class="bi bi-file-earmark-music" style="font-size: 2rem;"></i>
+                    <p class="mt-2">Нет сгенерированных файлов</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = data.files.map(file => `
+            <div class="tts-file-item border-bottom pb-2 mb-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <strong>${file.filename}</strong>
+                        <br>
+                        <small class="text-muted">
+                            <i class="bi bi-clock"></i> ${new Date(file.created).toLocaleString('ru-RU')}
+                            <br>
+                            <i class="bi bi-file-earmark"></i> ${(file.size / 1024).toFixed(1)} KB
+                        </small>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-primary" onclick="playAudio('${file.filename}')">
+                            <i class="bi bi-play"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Ошибка загрузки файлов:', error);
+        const container = document.getElementById('ttsFilesList');
+        container.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                TTS сервис недоступен
+            </div>
+        `;
+    }
+}
+
+function playAudio(filename) {
+    const audioPlayer = document.getElementById('audioPlayer');
+    const audioSource = document.getElementById('audioSource');
+
+    audioSource.src = `/api/tts/audio/${filename}`;
+    audioPlayer.load();
+    audioPlayer.play();
+
+    // Прокручиваем к плееру и показываем результат
+    document.getElementById('ttsResult').style.display = 'block';
+    document.getElementById('generatedFilename').textContent = filename;
+}
+
+// Обработчик формы TTS
+document.addEventListener('DOMContentLoaded', () => {
+    const ttsForm = document.getElementById('ttsForm');
+    const ttsTextarea = document.getElementById('ttsText');
+    const textLength = document.getElementById('textLength');
+    const generateBtn = document.getElementById('generateBtn');
+    const ttsResult = document.getElementById('ttsResult');
+    const ttsError = document.getElementById('ttsError');
+
+    // Счетчик символов
+    if (ttsTextarea) {
+        ttsTextarea.addEventListener('input', () => {
+            textLength.textContent = ttsTextarea.value.length;
+        });
+    }
+
+    // Отправка формы
+    if (ttsForm) {
+        ttsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const text = ttsTextarea.value.trim();
+            const filename = document.getElementById('ttsFilename').value.trim();
+
+            if (!text) {
+                ttsError.style.display = 'block';
+                document.getElementById('errorText').textContent = 'Введите текст для генерации';
+                return;
+            }
+
+            // Скрыть предыдущие сообщения
+            ttsResult.style.display = 'none';
+            ttsError.style.display = 'none';
+
+            // Показываем загрузку
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Генерация...';
+
+            try {
+                const response = await fetch(`${API_BASE}/tts/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        filename: filename || null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Успешно сгенерировано
+                    document.getElementById('generatedFilename').textContent = data.filename;
+
+                    // Загружаем аудио в плеер
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    const audioSource = document.getElementById('audioSource');
+                    audioSource.src = `/api/tts/audio/${data.filename}`;
+                    audioPlayer.load();
+
+                    ttsResult.style.display = 'block';
+
+                    // Обновляем список файлов
+                    loadTTSFiles();
+
+                    showNotification('Голос успешно сгенерирован!', 'success');
+
+                } else {
+                    throw new Error(data.detail || 'Ошибка генерации');
+                }
+
+            } catch (error) {
+                console.error('Ошибка TTS:', error);
+                ttsError.style.display = 'block';
+                document.getElementById('errorText').textContent = error.message;
+                showNotification('Ошибка генерации голоса', 'danger');
+            } finally {
+                // Восстанавливаем кнопку
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<i class="bi bi-play-circle"></i> Сгенерировать голос';
+            }
+        });
+    }
 });
 
 // ============================================
