@@ -16,10 +16,17 @@ COPY requirements.txt .
 # Устанавливаем Python зависимости
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Скачиваем Piper TTS бинарник и русскую модель
-RUN wget -q https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz && \
-    tar -xzf piper_amd64.tar.gz && \
-    rm piper_amd64.tar.gz && \
+# Скачиваем Piper TTS бинарник (определяем архитектуру)
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        PIPER_ARCH="arm64"; \
+    else \
+        PIPER_ARCH="amd64"; \
+    fi && \
+    echo "Downloading Piper for architecture: $PIPER_ARCH" && \
+    wget -q https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_${PIPER_ARCH}.tar.gz && \
+    tar -xzf piper_${PIPER_ARCH}.tar.gz && \
+    rm piper_${PIPER_ARCH}.tar.gz && \
     chmod +x piper/piper
 
 # Скачиваем русскую модель (средне-качественная, оптимальный размер)
