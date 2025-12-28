@@ -524,15 +524,18 @@ document.addEventListener('DOMContentLoaded', () => {
             generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Генерация...';
 
             try {
+                // Формируем тело запроса
+                const requestBody = { text: text };
+                if (filename) {
+                    requestBody.filename = filename;
+                }
+
                 const response = await fetch(`${API_BASE}/tts/generate`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        text: text,
-                        filename: filename || null
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 const data = await response.json();
