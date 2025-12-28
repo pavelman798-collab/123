@@ -29,12 +29,23 @@ RUN ARCH=$(uname -m) && \
     rm piper_${PIPER_ARCH}.tar.gz && \
     chmod +x piper/piper
 
-# Скачиваем русскую модель (средне-качественная, оптимальный размер)
+# Скачиваем русские модели голосов (мужские и женский)
 RUN mkdir -p /app/models && \
+    # Руслан - мужской голос (средний, нейтральный)
     wget -q -O /app/models/ru_RU-ruslan-medium.onnx \
     https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/ruslan/medium/ru_RU-ruslan-medium.onnx && \
     wget -q -O /app/models/ru_RU-ruslan-medium.onnx.json \
-    https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/ruslan/medium/ru_RU-ruslan-medium.onnx.json
+    https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/ruslan/medium/ru_RU-ruslan-medium.onnx.json && \
+    # Дмитрий - мужской голос (более энергичный)
+    wget -q -O /app/models/ru_RU-dmitri-medium.onnx \
+    https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/dmitri/medium/ru_RU-dmitri-medium.onnx && \
+    wget -q -O /app/models/ru_RU-dmitri-medium.onnx.json \
+    https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/dmitri/medium/ru_RU-dmitri-medium.onnx.json && \
+    # Ирина - женский голос (приятный, мягкий)
+    wget -q -O /app/models/ru_RU-irina-medium.onnx \
+    https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx && \
+    wget -q -O /app/models/ru_RU-irina-medium.onnx.json \
+    https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx.json
 
 # Копируем сервис
 COPY tts_service.py .

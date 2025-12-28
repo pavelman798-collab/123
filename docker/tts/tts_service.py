@@ -16,13 +16,36 @@ app = FastAPI(title="Piper TTS Service")
 
 # Конфигурация
 PIPER_PATH = os.getenv('PIPER_PATH', '/app/piper/piper')
-MODEL_PATH = os.getenv('MODEL_PATH', '/app/models/ru_RU-ruslan-medium.onnx')
 AUDIO_DIR = os.getenv('AUDIO_DIR', '/audio')
+
+# Доступные голосовые модели
+VOICE_MODELS = {
+    "ruslan": {
+        "name": "Руслан",
+        "gender": "male",
+        "description": "Мужской голос, нейтральный",
+        "path": "/app/models/ru_RU-ruslan-medium.onnx"
+    },
+    "dmitri": {
+        "name": "Дмитрий",
+        "gender": "male",
+        "description": "Мужской голос, энергичный",
+        "path": "/app/models/ru_RU-dmitri-medium.onnx"
+    },
+    "irina": {
+        "name": "Ирина",
+        "gender": "female",
+        "description": "Женский голос, мягкий",
+        "path": "/app/models/ru_RU-irina-medium.onnx"
+    }
+}
 
 
 class TTSRequest(BaseModel):
     text: str
     filename: str = None  # Опционально: имя файла (иначе генерируется автоматически)
+    voice: str = "ruslan"  # Голос: ruslan, dmitri, irina
+    speed: float = 1.0  # Скорость: 0.5 (медленно) - 2.0 (быстро)
 
 
 @app.get("/")
@@ -31,8 +54,24 @@ async def root():
     return {
         "service": "Piper TTS",
         "status": "running",
-        "model": "ru_RU-ruslan-medium",
-        "version": "1.0.0"
+        "version": "2.0.0",
+        "voices": list(VOICE_MODELS.keys())
+    }
+
+
+@app.get("/api/tts/voices")
+async def get_voices():
+    """Список доступных голосов"""
+    return {
+        "voices": [
+            {
+                "id": voice_id,
+                "name": voice_data["name"],
+                "gender": voice_data["gender"],
+                "description": voice_data["description"]
+            }
+            for voice_id, voice_data in VOICE_MODELS.items()
+        ]
     }
 
 
@@ -70,6 +109,17 @@ async def generate_speech(request: TTSRequest):
     if not request.text or len(request.text.strip()) == 0:
         raise HTTPException(status_code=400, detail="Текст не может быть пустым")
 
+    # Проверяем валидность голоса
+    if request.voice not in VOICE_MODELS:
+        raise HTTPException(status_code=400, detail=f"Неизвестный голос: {request.voice}")
+
+    # Проверяем валидность скорости
+    if not (0.5 <= request.speed <= 2.0):
+        raise HTTPException(status_code=400, detail="Скорость должна быть от 0.5 до 2.0")
+
+    # Выбираем модель голоса
+    model_path = VOICE_MODELS[request.voice]["path"]
+
     # Генерируем имя файла
     if request.filename:
         # Убираем расширение если есть и добавляем .wav
@@ -83,10 +133,20 @@ async def generate_speech(request: TTSRequest):
     output_path = os.path.join(AUDIO_DIR, filename)
 
     try:
+        # Вычисляем length_scale (обратно скорости: меньше = быстрее)
+        length_scale = 1.0 / request.speed
+
         # Запускаем Piper для генерации речи
-        # echo "текст" | piper --model model.onnx --output_file output.wav
+        # echo "текст" | piper --model model.onnx --length_scale 1.0 --output_file output.wav
+        piper_command = [
+            PIPER_PATH,
+            '--model', model_path,
+            '--length_scale', str(length_scale),
+            '--output_file', output_path
+        ]
+
         process = subprocess.Popen(
-            [PIPER_PATH, '--model', MODEL_PATH, '--output_file', output_path],
+            piper_command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -109,7 +169,9 @@ async def generate_speech(request: TTSRequest):
             "filename": filename,
             "path": output_path,
             "size": file_size,
-            "text_length": len(request.text)
+            "text_length": len(request.text),
+            "voice": request.voice,
+            "speed": request.speed
         }
 
     except Exception as e:

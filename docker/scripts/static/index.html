@@ -147,6 +147,29 @@
                                             </small>
                                         </div>
 
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label for="ttsVoice" class="form-label">Голос</label>
+                                                <select class="form-select" id="ttsVoice">
+                                                    <option value="ruslan">👨 Руслан (мужской, нейтральный)</option>
+                                                    <option value="dmitri">👨 Дмитрий (мужской, энергичный)</option>
+                                                    <option value="irina">👩 Ирина (женский, мягкий)</option>
+                                                </select>
+                                            </div>
+
+                                            <div class="col-md-6 mb-3">
+                                                <label for="ttsSpeed" class="form-label">
+                                                    Скорость: <span id="speedValue">1.0x</span>
+                                                </label>
+                                                <input type="range" class="form-range" id="ttsSpeed"
+                                                    min="0.5" max="2.0" step="0.1" value="1.0">
+                                                <div class="d-flex justify-content-between">
+                                                    <small class="text-muted">0.5x (медленно)</small>
+                                                    <small class="text-muted">2.0x (быстро)</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <div class="mb-3">
                                             <label for="ttsFilename" class="form-label">Имя файла (опционально)</label>
                                             <input type="text" class="form-control" id="ttsFilename"

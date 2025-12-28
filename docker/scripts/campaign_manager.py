@@ -64,6 +64,8 @@ class CallRequest(BaseModel):
 class TTSRequest(BaseModel):
     text: str
     filename: Optional[str] = None
+    voice: str = "ruslan"  # ruslan, dmitri, irina
+    speed: float = 1.0  # 0.5 - 2.0
 
 
 # ============== DATABASE ==============
@@ -346,7 +348,11 @@ async def generate_tts(request: TTSRequest):
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             # Формируем тело запроса, не отправляем filename если он None
-            payload = {"text": request.text}
+            payload = {
+                "text": request.text,
+                "voice": request.voice,
+                "speed": request.speed
+            }
             if request.filename:
                 payload["filename"] = request.filename
 
@@ -416,6 +422,32 @@ async def get_tts_audio(filename: str):
                 )
             else:
                 raise HTTPException(status_code=404, detail="Audio file not found")
+
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"TTS service unavailable: {str(e)}"
+        )
+
+
+@app.get("/api/tts/voices")
+async def get_tts_voices():
+    """
+    Получить список доступных голосов
+
+    GET /api/tts/voices
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{TTS_SERVICE_URL}/api/tts/voices")
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail="Failed to get voices"
+                )
 
     except httpx.RequestError as e:
         raise HTTPException(

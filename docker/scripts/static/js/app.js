@@ -493,11 +493,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const generateBtn = document.getElementById('generateBtn');
     const ttsResult = document.getElementById('ttsResult');
     const ttsError = document.getElementById('ttsError');
+    const ttsSpeed = document.getElementById('ttsSpeed');
+    const speedValue = document.getElementById('speedValue');
 
     // Счетчик символов
     if (ttsTextarea) {
         ttsTextarea.addEventListener('input', () => {
             textLength.textContent = ttsTextarea.value.length;
+        });
+    }
+
+    // Обновление значения скорости
+    if (ttsSpeed) {
+        ttsSpeed.addEventListener('input', () => {
+            speedValue.textContent = ttsSpeed.value + 'x';
         });
     }
 
@@ -508,6 +517,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const text = ttsTextarea.value.trim();
             const filename = document.getElementById('ttsFilename').value.trim();
+            const voice = document.getElementById('ttsVoice').value;
+            const speed = parseFloat(ttsSpeed.value);
 
             if (!text) {
                 ttsError.style.display = 'block';
@@ -525,7 +536,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Формируем тело запроса
-                const requestBody = { text: text };
+                const requestBody = {
+                    text: text,
+                    voice: voice,
+                    speed: speed
+                };
                 if (filename) {
                     requestBody.filename = filename;
                 }
