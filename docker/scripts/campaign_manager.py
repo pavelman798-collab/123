@@ -345,12 +345,14 @@ async def generate_tts(request: TTSRequest):
     """
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
+            # Формируем тело запроса, не отправляем filename если он None
+            payload = {"text": request.text}
+            if request.filename:
+                payload["filename"] = request.filename
+
             response = await client.post(
                 f"{TTS_SERVICE_URL}/api/tts/generate",
-                json={
-                    "text": request.text,
-                    "filename": request.filename
-                }
+                json=payload
             )
 
             if response.status_code == 200:
