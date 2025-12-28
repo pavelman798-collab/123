@@ -61,6 +61,9 @@ function showSection(sectionName) {
         case 'campaigns':
             loadCampaigns();
             break;
+        case 'newCampaign':
+            loadAudioFilesForCampaign();
+            break;
         case 'tts':
             loadTTSFiles();
             break;
@@ -421,6 +424,32 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================
 // TTS - Генератор голоса
 // ============================================
+
+async function loadAudioFilesForCampaign() {
+    /**
+     * Загружает список аудио файлов для выбора при создании кампании
+     */
+    try {
+        const response = await fetch(`${API_BASE}/tts/files`);
+        const data = await response.json();
+
+        const select = document.getElementById('audioFile');
+
+        // Очищаем options кроме первого
+        select.innerHTML = '<option value="">-- Без аудио --</option>';
+
+        if (data.total > 0) {
+            data.files.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file.filename;
+                option.textContent = `${file.filename} (${(file.size / 1024).toFixed(1)} KB)`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки аудио файлов:', error);
+    }
+}
 
 async function loadTTSFiles() {
     try {

@@ -105,8 +105,11 @@
 
                                 <div class="mb-3">
                                     <label for="audioFile" class="form-label">Аудиофайл (опционально)</label>
-                                    <input type="text" class="form-control" id="audioFile" placeholder="message.wav">
-                                    <small class="form-text text-muted">Укажите имя файла из папки /audio</small>
+                                    <select class="form-select" id="audioFile">
+                                        <option value="">-- Без аудио --</option>
+                                        <option value="" disabled>Загрузка списка...</option>
+                                    </select>
+                                    <small class="form-text text-muted">Выберите файл из сгенерированных или загруженных</small>
                                 </div>
 
                                 <div class="mb-3">
