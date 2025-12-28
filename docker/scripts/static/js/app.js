@@ -63,6 +63,8 @@ function showSection(sectionName) {
             break;
         case 'newCampaign':
             loadAudioFilesForCampaign();
+            loadSMSTemplates('no_answer', 'smsNoAnswerTemplate');
+            loadSMSTemplates('success', 'smsSuccessTemplate');
             break;
         case 'tts':
             loadTTSFiles();
@@ -376,8 +378,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const name = document.getElementById('campaignName').value;
         const description = document.getElementById('campaignDescription').value;
+        const campaignType = document.getElementById('campaignType').value;
         const audioFile = document.getElementById('audioFile').value;
         const numbersFile = document.getElementById('numbersFile').files[0];
+
+        // SMS fields
+        const sendSmsOnNoAnswer = document.getElementById('sendSmsOnNoAnswer').checked;
+        const sendSmsOnSuccess = document.getElementById('sendSmsOnSuccess').checked;
+        const smsNoAnswerText = document.getElementById('smsNoAnswerText').value;
+        const smsSuccessText = document.getElementById('smsSuccessText').value;
 
         try {
             // Создаем кампанию
@@ -389,7 +398,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     name,
                     description,
-                    audio_file: audioFile || null
+                    campaign_type: campaignType,
+                    audio_file: audioFile || null,
+                    sms_on_no_answer: smsNoAnswerText || null,
+                    sms_on_success: smsSuccessText || null,
+                    send_sms_on_no_answer: sendSmsOnNoAnswer,
+                    send_sms_on_success: sendSmsOnSuccess
                 })
             });
 
@@ -618,6 +632,192 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ============================================
+// SMS - Управление шаблонами и кампаниями
+// ============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    const campaignType = document.getElementById('campaignType');
+    const audioFileSection = document.getElementById('audioFileSection');
+    const smsSection = document.getElementById('smsSection');
+    const smsNoAnswerSection = document.getElementById('smsNoAnswerSection');
+    const smsSuccessSection = document.getElementById('smsSuccessSection');
+
+    // Обработчик изменения типа кампании
+    if (campaignType) {
+        campaignType.addEventListener('change', () => {
+            const type = campaignType.value;
+
+            // Показываем/скрываем секции в зависимости от типа
+            if (type === 'call') {
+                // Только звонки
+                audioFileSection.style.display = 'block';
+                smsSection.style.display = 'none';
+            } else if (type === 'sms') {
+                // Только СМС
+                audioFileSection.style.display = 'none';
+                smsSection.style.display = 'block';
+                // Для SMS кампании скрываем опции "при недозвоне/успехе"
+                smsNoAnswerSection.querySelector('.form-check').style.display = 'none';
+                smsSuccessSection.querySelector('.form-check').style.display = 'none';
+                // Показываем только текстовые поля
+                document.getElementById('smsNoAnswerTextSection').style.display = 'block';
+            } else if (type === 'call_and_sms') {
+                // Звонки + СМС
+                audioFileSection.style.display = 'block';
+                smsSection.style.display = 'block';
+                // Показываем чекбоксы
+                smsNoAnswerSection.querySelector('.form-check').style.display = 'block';
+                smsSuccessSection.querySelector('.form-check').style.display = 'block';
+            }
+        });
+    }
+
+    // Обработчики чекбоксов СМС
+    const sendSmsOnNoAnswer = document.getElementById('sendSmsOnNoAnswer');
+    const sendSmsOnSuccess = document.getElementById('sendSmsOnSuccess');
+
+    if (sendSmsOnNoAnswer) {
+        sendSmsOnNoAnswer.addEventListener('change', () => {
+            document.getElementById('smsNoAnswerTextSection').style.display =
+                sendSmsOnNoAnswer.checked ? 'block' : 'none';
+        });
+    }
+
+    if (sendSmsOnSuccess) {
+        sendSmsOnSuccess.addEventListener('change', () => {
+            document.getElementById('smsSuccessTextSection').style.display =
+                sendSmsOnSuccess.checked ? 'block' : 'none';
+        });
+    }
+
+    // Загрузка шаблонов при открытии формы кампании
+    const loadTemplatesNoAnswer = document.getElementById('loadTemplatesNoAnswer');
+    const loadTemplatesSuccess = document.getElementById('loadTemplatesSuccess');
+
+    if (loadTemplatesNoAnswer) {
+        loadTemplatesNoAnswer.addEventListener('click', () => {
+            loadSMSTemplates('no_answer', 'smsNoAnswerTemplate');
+        });
+    }
+
+    if (loadTemplatesSuccess) {
+        loadTemplatesSuccess.addEventListener('click', () => {
+            loadSMSTemplates('success', 'smsSuccessTemplate');
+        });
+    }
+
+    // Обработчики выбора шаблона
+    const smsNoAnswerTemplate = document.getElementById('smsNoAnswerTemplate');
+    const smsSuccessTemplate = document.getElementById('smsSuccessTemplate');
+
+    if (smsNoAnswerTemplate) {
+        smsNoAnswerTemplate.addEventListener('change', () => {
+            const selectedOption = smsNoAnswerTemplate.options[smsNoAnswerTemplate.selectedIndex];
+            if (selectedOption.dataset.text) {
+                document.getElementById('smsNoAnswerText').value = selectedOption.dataset.text;
+            }
+        });
+    }
+
+    if (smsSuccessTemplate) {
+        smsSuccessTemplate.addEventListener('change', () => {
+            const selectedOption = smsSuccessTemplate.options[smsSuccessTemplate.selectedIndex];
+            if (selectedOption.dataset.text) {
+                document.getElementById('smsSuccessText').value = selectedOption.dataset.text;
+            }
+        });
+    }
+
+    // Сохранение шаблонов
+    const saveTemplateNoAnswer = document.getElementById('saveTemplateNoAnswer');
+    const saveTemplateSuccess = document.getElementById('saveTemplateSuccess');
+
+    if (saveTemplateNoAnswer) {
+        saveTemplateNoAnswer.addEventListener('click', async () => {
+            const text = document.getElementById('smsNoAnswerText').value.trim();
+            if (!text) {
+                showNotification('Введите текст СМС для сохранения', 'warning');
+                return;
+            }
+            const name = prompt('Введите название шаблона:');
+            if (name) {
+                await saveSMSTemplate(name, text, 'no_answer');
+            }
+        });
+    }
+
+    if (saveTemplateSuccess) {
+        saveTemplateSuccess.addEventListener('click', async () => {
+            const text = document.getElementById('smsSuccessText').value.trim();
+            if (!text) {
+                showNotification('Введите текст СМС для сохранения', 'warning');
+                return;
+            }
+            const name = prompt('Введите название шаблона:');
+            if (name) {
+                await saveSMSTemplate(name, text, 'success');
+            }
+        });
+    }
+});
+
+// Загрузка шаблонов СМС
+async function loadSMSTemplates(category, selectId) {
+    try {
+        const url = category ? `${API_BASE}/sms/templates?category=${category}` : `${API_BASE}/sms/templates`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const select = document.getElementById(selectId);
+
+        // Очищаем и добавляем опцию по умолчанию
+        select.innerHTML = '<option value="">-- Выберите шаблон --</option>';
+
+        if (data.templates && data.templates.length > 0) {
+            data.templates.forEach(template => {
+                const option = document.createElement('option');
+                option.value = template.id;
+                option.textContent = template.name;
+                option.dataset.text = template.text;
+                select.appendChild(option);
+            });
+            showNotification(`Загружено шаблонов: ${data.templates.length}`, 'info');
+        } else {
+            showNotification('Шаблоны не найдены', 'info');
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки шаблонов:', error);
+        showNotification('Ошибка загрузки шаблонов', 'danger');
+    }
+}
+
+// Сохранение шаблона СМС
+async function saveSMSTemplate(name, text, category) {
+    try {
+        const response = await fetch(`${API_BASE}/sms/templates`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name,
+                text,
+                category
+            })
+        });
+
+        if (response.ok) {
+            showNotification('Шаблон сохранен!', 'success');
+        } else {
+            throw new Error('Ошибка сохранения шаблона');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showNotification('Ошибка сохранения шаблона', 'danger');
+    }
+}
 
 // ============================================
 // Вспомогательные функции

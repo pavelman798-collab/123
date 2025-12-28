@@ -103,13 +103,86 @@
                                     <textarea class="form-control" id="campaignDescription" rows="3"></textarea>
                                 </div>
 
+                                <!-- Campaign Type Selection -->
                                 <div class="mb-3">
-                                    <label for="audioFile" class="form-label">Аудиофайл (опционально)</label>
+                                    <label for="campaignType" class="form-label">Тип кампании</label>
+                                    <select class="form-select" id="campaignType" required>
+                                        <option value="call">📞 Позвонить</option>
+                                        <option value="sms">💬 Отправить СМС</option>
+                                        <option value="call_and_sms">📞💬 Позвонить + Отправить СМС</option>
+                                    </select>
+                                </div>
+
+                                <!-- Audio File (for calls) -->
+                                <div class="mb-3" id="audioFileSection">
+                                    <label for="audioFile" class="form-label">Аудиофайл</label>
                                     <select class="form-select" id="audioFile">
                                         <option value="">-- Без аудио --</option>
                                         <option value="" disabled>Загрузка списка...</option>
                                     </select>
                                     <small class="form-text text-muted">Выберите файл из сгенерированных или загруженных</small>
+                                </div>
+
+                                <!-- SMS Section -->
+                                <div id="smsSection" style="display: none;">
+                                    <div class="card mb-3">
+                                        <div class="card-header bg-info text-white">
+                                            <i class="bi bi-chat-text"></i> Настройки СМС
+                                        </div>
+                                        <div class="card-body">
+                                            <!-- SMS on No Answer -->
+                                            <div class="mb-3" id="smsNoAnswerSection">
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="sendSmsOnNoAnswer">
+                                                    <label class="form-check-label" for="sendSmsOnNoAnswer">
+                                                        Отправлять СМС при недозвоне
+                                                    </label>
+                                                </div>
+                                                <div id="smsNoAnswerTextSection" style="display: none;">
+                                                    <label for="smsNoAnswerText" class="form-label">Текст СМС при недозвоне</label>
+                                                    <div class="input-group mb-2">
+                                                        <select class="form-select" id="smsNoAnswerTemplate">
+                                                            <option value="">-- Выберите шаблон --</option>
+                                                        </select>
+                                                        <button class="btn btn-outline-secondary" type="button" id="loadTemplatesNoAnswer">
+                                                            <i class="bi bi-arrow-clockwise"></i>
+                                                        </button>
+                                                    </div>
+                                                    <textarea class="form-control" id="smsNoAnswerText" rows="3"
+                                                        placeholder="Здравствуйте! К сожалению, не удалось до вас дозвониться..."></textarea>
+                                                    <button class="btn btn-sm btn-success mt-2" type="button" id="saveTemplateNoAnswer">
+                                                        <i class="bi bi-plus-circle"></i> Сохранить как шаблон
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <!-- SMS on Success -->
+                                            <div class="mb-3" id="smsSuccessSection">
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="sendSmsOnSuccess">
+                                                    <label class="form-check-label" for="sendSmsOnSuccess">
+                                                        Отправлять СМС при успешном дозвоне
+                                                    </label>
+                                                </div>
+                                                <div id="smsSuccessTextSection" style="display: none;">
+                                                    <label for="smsSuccessText" class="form-label">Текст СМС при успешном дозвоне</label>
+                                                    <div class="input-group mb-2">
+                                                        <select class="form-select" id="smsSuccessTemplate">
+                                                            <option value="">-- Выберите шаблон --</option>
+                                                        </select>
+                                                        <button class="btn btn-outline-secondary" type="button" id="loadTemplatesSuccess">
+                                                            <i class="bi bi-arrow-clockwise"></i>
+                                                        </button>
+                                                    </div>
+                                                    <textarea class="form-control" id="smsSuccessText" rows="3"
+                                                        placeholder="Спасибо за звонок! Дополнительная информация..."></textarea>
+                                                    <button class="btn btn-sm btn-success mt-2" type="button" id="saveTemplateSuccess">
+                                                        <i class="bi bi-plus-circle"></i> Сохранить как шаблон
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="mb-3">

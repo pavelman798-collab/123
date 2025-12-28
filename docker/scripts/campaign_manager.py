@@ -42,13 +42,25 @@ AMI_CONFIG = {
 
 TTS_SERVICE_URL = os.getenv('TTS_SERVICE_URL', 'http://tts-service:5000')
 
+GOIP_CONFIG = {
+    'host': os.getenv('GOIP_HOST', '192.168.8.1'),
+    'username': os.getenv('GOIP_USER', 'admin'),
+    'password': os.getenv('GOIP_PASS', 'admin'),
+    'use_ssl': os.getenv('GOIP_SSL', 'false').lower() == 'true'
+}
+
 
 # ============== MODELS ==============
 
 class Campaign(BaseModel):
     name: str
     description: Optional[str] = None
+    campaign_type: str = "call"  # call, sms, call_and_sms
     audio_file: Optional[str] = None
+    sms_on_no_answer: Optional[str] = None
+    sms_on_success: Optional[str] = None
+    send_sms_on_no_answer: bool = False
+    send_sms_on_success: bool = False
 
 
 class CampaignNumbers(BaseModel):
@@ -66,6 +78,18 @@ class TTSRequest(BaseModel):
     filename: Optional[str] = None
     voice: str = "ruslan"  # ruslan, dmitri, irina
     speed: float = 1.0  # 0.5 - 2.0
+
+
+class SMSTemplate(BaseModel):
+    name: str
+    text: str
+    category: Optional[str] = "general"  # no_answer, success, general
+
+
+class SMSRequest(BaseModel):
+    phone_number: str
+    message: str
+    sim_number: Optional[int] = None
 
 
 # ============== DATABASE ==============
@@ -108,6 +132,63 @@ async def make_call_via_ami(phone_number: str, audio_file: Optional[str] = None)
 
     except Exception as e:
         return {'success': False, 'error': str(e)}
+
+
+async def send_sms_via_goip(phone_number: str, message: str, sim_number: int = 1):
+    """
+    Отправить СМС через GoIP HTTP API
+
+    Args:
+        phone_number: Номер телефона (79991234567)
+        message: Текст сообщения (кириллица будет закодирована в URL)
+        sim_number: Номер SIM-карты (1-4)
+
+    Returns:
+        dict: {'success': True/False, 'response': str, 'error': str}
+    """
+    try:
+        protocol = 'https' if GOIP_CONFIG['use_ssl'] else 'http'
+        base_url = f"{protocol}://{GOIP_CONFIG['host']}"
+
+        # GoIP SMS API endpoint
+        # Формат: /default/en_US/send.html?username=admin&password=admin&smsnum=1&Memo=message&telnum=79991234567
+        url = f"{base_url}/default/en_US/send.html"
+
+        params = {
+            'username': GOIP_CONFIG['username'],
+            'password': GOIP_CONFIG['password'],
+            'smsnum': str(sim_number),
+            'Memo': message,
+            'telnum': phone_number
+        }
+
+        async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+            response = await client.get(url, params=params)
+
+            # GoIP возвращает "send success" при успехе
+            if response.status_code == 200 and 'success' in response.text.lower():
+                return {
+                    'success': True,
+                    'response': response.text,
+                    'sim_number': sim_number
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f"GoIP response: {response.text}",
+                    'status_code': response.status_code
+                }
+
+    except httpx.RequestError as e:
+        return {
+            'success': False,
+            'error': f'GoIP connection error: {str(e)}'
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'SMS send error: {str(e)}'
+        }
 
 
 # ============== API ENDPOINTS ==============
@@ -157,10 +238,19 @@ async def create_campaign(campaign: Campaign):
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT INTO campaigns (name, description, audio_file, status)
-        VALUES (%s, %s, %s, 'draft')
+        INSERT INTO campaigns (
+            name, description, campaign_type, audio_file,
+            sms_on_no_answer, sms_on_success,
+            send_sms_on_no_answer, send_sms_on_success,
+            status
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'draft')
         RETURNING id
-    """, (campaign.name, campaign.description, campaign.audio_file))
+    """, (
+        campaign.name, campaign.description, campaign.campaign_type,
+        campaign.audio_file, campaign.sms_on_no_answer, campaign.sms_on_success,
+        campaign.send_sms_on_no_answer, campaign.send_sms_on_success
+    ))
 
     campaign_id = cur.fetchone()[0]
 
@@ -486,11 +576,190 @@ async def check_tts_health():
         }
 
 
+# ============== SMS TEMPLATE ENDPOINTS ==============
+
+@app.get("/api/sms/templates")
+async def list_sms_templates(category: Optional[str] = None):
+    """
+    Получить список шаблонов СМС
+
+    GET /api/sms/templates
+    GET /api/sms/templates?category=no_answer
+    """
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    if category:
+        cur.execute("""
+            SELECT id, name, text, category, created_at, updated_at
+            FROM sms_templates
+            WHERE category = %s
+            ORDER BY created_at DESC
+        """, (category,))
+    else:
+        cur.execute("""
+            SELECT id, name, text, category, created_at, updated_at
+            FROM sms_templates
+            ORDER BY created_at DESC
+        """)
+
+    templates = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return {"templates": templates}
+
+
+@app.post("/api/sms/templates")
+async def create_sms_template(template: SMSTemplate):
+    """
+    Создать новый шаблон СМС
+
+    POST /api/sms/templates
+    {
+        "name": "Напоминание о записи",
+        "text": "Здравствуйте! Напоминаем о записи завтра в 15:00.",
+        "category": "no_answer"
+    }
+    """
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO sms_templates (name, text, category)
+        VALUES (%s, %s, %s)
+        RETURNING id
+    """, (template.name, template.text, template.category))
+
+    template_id = cur.fetchone()[0]
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {
+        "template_id": template_id,
+        "status": "created",
+        "name": template.name
+    }
+
+
+@app.put("/api/sms/templates/{template_id}")
+async def update_sms_template(template_id: int, template: SMSTemplate):
+    """
+    Обновить шаблон СМС
+
+    PUT /api/sms/templates/1
+    """
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE sms_templates
+        SET name = %s, text = %s, category = %s, updated_at = %s
+        WHERE id = %s
+    """, (template.name, template.text, template.category, datetime.now(), template_id))
+
+    conn.commit()
+    affected = cur.rowcount
+    cur.close()
+    conn.close()
+
+    if affected == 0:
+        raise HTTPException(status_code=404, detail="Шаблон не найден")
+
+    return {"template_id": template_id, "status": "updated"}
+
+
+@app.delete("/api/sms/templates/{template_id}")
+async def delete_sms_template(template_id: int):
+    """
+    Удалить шаблон СМС
+
+    DELETE /api/sms/templates/1
+    """
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM sms_templates WHERE id = %s", (template_id,))
+
+    conn.commit()
+    affected = cur.rowcount
+    cur.close()
+    conn.close()
+
+    if affected == 0:
+        raise HTTPException(status_code=404, detail="Шаблон не найден")
+
+    return {"template_id": template_id, "status": "deleted"}
+
+
+# ============== SMS SENDING ENDPOINTS ==============
+
+@app.post("/api/sms/send")
+async def send_sms(sms: SMSRequest):
+    """
+    Отправить СМС через GoIP
+
+    POST /api/sms/send
+    {
+        "phone_number": "79991234567",
+        "message": "Ваше сообщение",
+        "sim_number": 1
+    }
+    """
+    # Определяем SIM-карту если не указана
+    sim_number = sms.sim_number if sms.sim_number else 1
+
+    # Отправляем СМС через GoIP
+    result = await send_sms_via_goip(sms.phone_number, sms.message, sim_number)
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Определяем статус
+    status = 'sent' if result['success'] else 'failed'
+
+    # Логируем в sms_log
+    cur.execute("""
+        INSERT INTO sms_log (phone_number, sim_number, message, status, sent_at)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING id
+    """, (
+        sms.phone_number,
+        sim_number,
+        sms.message,
+        status,
+        datetime.now() if result['success'] else None
+    ))
+
+    sms_id = cur.fetchone()[0]
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    if result['success']:
+        return {
+            "sms_id": sms_id,
+            "status": "sent",
+            "phone_number": sms.phone_number,
+            "sim_number": sim_number,
+            "goip_response": result.get('response', '')
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка отправки СМС: {result.get('error', 'Unknown error')}"
+        )
+
+
 # ============== BACKGROUND TASKS ==============
 
 async def process_campaign(campaign_id: int):
     """
     Фоновая задача для обработки кампании
+    Поддерживает: звонки, СМС, звонки+СМС
     С антидетект-логикой (рандомные интервалы)
     """
     conn = get_db()
@@ -499,7 +768,10 @@ async def process_campaign(campaign_id: int):
     while True:
         # Проверяем статус кампании
         cur.execute("""
-            SELECT status, audio_file FROM campaigns WHERE id = %s
+            SELECT status, audio_file, campaign_type,
+                   sms_on_no_answer, sms_on_success,
+                   send_sms_on_no_answer, send_sms_on_success
+            FROM campaigns WHERE id = %s
         """, (campaign_id,))
 
         campaign = cur.fetchone()
@@ -527,37 +799,118 @@ async def process_campaign(campaign_id: int):
             conn.commit()
             break
 
-        # Выполняем звонок
-        cur.execute("""
-            UPDATE campaign_numbers
-            SET status = 'calling', last_attempt_time = %s, call_attempts = call_attempts + 1
-            WHERE id = %s
-        """, (datetime.now(), number['id']))
+        # Обрабатываем номер в зависимости от типа кампании
+        campaign_type = campaign['campaign_type']
+        call_success = False
+        sms_sent = False
 
-        conn.commit()
+        # ========== ЗВОНКИ ==========
+        if campaign_type in ['call', 'call_and_sms']:
+            # Выполняем звонок
+            cur.execute("""
+                UPDATE campaign_numbers
+                SET status = 'calling', last_attempt_time = %s, call_attempts = call_attempts + 1
+                WHERE id = %s
+            """, (datetime.now(), number['id']))
+            conn.commit()
 
-        # Звоним
-        result = await make_call_via_ami(number['phone_number'], campaign['audio_file'])
+            # Звоним
+            result = await make_call_via_ami(number['phone_number'], campaign['audio_file'])
 
-        # Обновляем статус (упрощенно)
-        new_status = 'answered' if result['success'] else 'failed'
+            # Обновляем статус звонка
+            new_status = 'answered' if result['success'] else 'no_answer'
+            call_success = result['success']
 
-        cur.execute("""
-            UPDATE campaign_numbers
-            SET status = %s
-            WHERE id = %s
-        """, (new_status, number['id']))
+            cur.execute("""
+                UPDATE campaign_numbers
+                SET status = %s
+                WHERE id = %s
+            """, (new_status, number['id']))
 
-        # Обновляем счетчики кампании
-        cur.execute("""
-            UPDATE campaigns
-            SET processed_numbers = processed_numbers + 1,
-                successful_calls = successful_calls + CASE WHEN %s = 'answered' THEN 1 ELSE 0 END,
-                failed_calls = failed_calls + CASE WHEN %s = 'failed' THEN 1 ELSE 0 END
-            WHERE id = %s
-        """, (new_status, new_status, campaign_id))
+            # Обновляем счетчики звонков
+            cur.execute("""
+                UPDATE campaigns
+                SET processed_numbers = processed_numbers + 1,
+                    successful_calls = successful_calls + CASE WHEN %s = 'answered' THEN 1 ELSE 0 END,
+                    failed_calls = failed_calls + CASE WHEN %s = 'no_answer' THEN 1 ELSE 0 END
+                WHERE id = %s
+            """, (new_status, new_status, campaign_id))
+            conn.commit()
 
-        conn.commit()
+        # ========== СМС ==========
+        # Отправляем СМС если:
+        # 1. Тип кампании = 'sms' (только СМС)
+        # 2. Тип = 'call_and_sms' + недозвон + включена опция send_sms_on_no_answer
+        # 3. Тип = 'call_and_sms' + успешный звонок + включена опция send_sms_on_success
+
+        sms_text = None
+
+        if campaign_type == 'sms':
+            # Только СМС кампания - отправляем всегда
+            sms_text = campaign['sms_on_no_answer'] or campaign['sms_on_success'] or "SMS-сообщение"
+
+        elif campaign_type == 'call_and_sms':
+            # Звонок + СМС
+            if not call_success and campaign['send_sms_on_no_answer']:
+                # Недозвон -> отправляем СМС при недозвоне
+                sms_text = campaign['sms_on_no_answer']
+            elif call_success and campaign['send_sms_on_success']:
+                # Успешный звонок -> отправляем СМС при успехе
+                sms_text = campaign['sms_on_success']
+
+        # Отправляем СМС если есть текст
+        if sms_text:
+            # Определяем SIM-карту (используем ту же что для звонка, или первую доступную)
+            sim_number = 1  # TODO: улучшить выбор SIM по оператору
+
+            sms_result = await send_sms_via_goip(number['phone_number'], sms_text, sim_number)
+            sms_sent = sms_result['success']
+
+            # Обновляем статус СМС в campaign_numbers
+            cur.execute("""
+                UPDATE campaign_numbers
+                SET sms_status = %s,
+                    sms_sent_at = %s,
+                    sms_text = %s
+                WHERE id = %s
+            """, (
+                'sent' if sms_sent else 'failed',
+                datetime.now() if sms_sent else None,
+                sms_text,
+                number['id']
+            ))
+
+            # Обновляем счетчики СМС в кампании
+            cur.execute("""
+                UPDATE campaigns
+                SET sms_sent = sms_sent + CASE WHEN %s THEN 1 ELSE 0 END,
+                    sms_failed = sms_failed + CASE WHEN NOT %s THEN 1 ELSE 0 END
+                WHERE id = %s
+            """, (sms_sent, sms_sent, campaign_id))
+
+            # Логируем в sms_log
+            cur.execute("""
+                INSERT INTO sms_log (campaign_id, phone_number, sim_number, message, status, sent_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                campaign_id,
+                number['phone_number'],
+                sim_number,
+                sms_text,
+                'sent' if sms_sent else 'failed',
+                datetime.now() if sms_sent else None
+            ))
+
+            conn.commit()
+
+        # Если только СМС кампания и мы только что отправили СМС, обновляем счетчик processed
+        if campaign_type == 'sms':
+            cur.execute("""
+                UPDATE campaigns
+                SET processed_numbers = processed_numbers + 1
+                WHERE id = %s
+            """, (campaign_id,))
+            conn.commit()
 
         # Антидетект: случайная пауза (45 сек - 3 мин)
         delay = random.uniform(45, 180)

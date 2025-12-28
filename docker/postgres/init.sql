@@ -33,12 +33,19 @@ CREATE TABLE IF NOT EXISTS campaigns (
     id SERIAL PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
     description TEXT,
+    campaign_type VARCHAR(20) DEFAULT 'call',  -- call, sms, call_and_sms
     audio_file VARCHAR(255),         -- Путь к аудиофайлу
+    sms_on_no_answer TEXT,           -- Текст СМС при недозвоне
+    sms_on_success TEXT,             -- Текст СМС при успешном дозвоне
+    send_sms_on_no_answer BOOLEAN DEFAULT FALSE,  -- Отправлять ли СМС при недозвоне
+    send_sms_on_success BOOLEAN DEFAULT FALSE,    -- Отправлять ли СМС при успешном дозвоне
     status VARCHAR(20) DEFAULT 'draft',  -- draft, running, paused, completed
     total_numbers INTEGER DEFAULT 0,
     processed_numbers INTEGER DEFAULT 0,
     successful_calls INTEGER DEFAULT 0,
     failed_calls INTEGER DEFAULT 0,
+    sms_sent INTEGER DEFAULT 0,      -- Количество отправленных СМС
+    sms_failed INTEGER DEFAULT 0,    -- Количество неудачных СМС
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     started_at TIMESTAMP,
     completed_at TIMESTAMP
@@ -56,6 +63,9 @@ CREATE TABLE IF NOT EXISTS campaign_numbers (
     last_attempt_time TIMESTAMP,
     answer_time TIMESTAMP,
     duration INTEGER,                -- Длительность в секундах
+    sms_status VARCHAR(20),          -- pending, sent, failed (статус отправки СМС)
+    sms_sent_at TIMESTAMP,           -- Время отправки СМС
+    sms_text TEXT,                   -- Текст отправленной СМС
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_campaign_status (campaign_id, status),
     INDEX idx_phone (phone_number)
@@ -86,6 +96,16 @@ CREATE TABLE IF NOT EXISTS sms_log (
     status VARCHAR(20) DEFAULT 'pending',  -- pending, sent, failed
     sent_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Таблица шаблонов СМС
+CREATE TABLE IF NOT EXISTS sms_templates (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,      -- Название шаблона
+    text TEXT NOT NULL,              -- Текст шаблона
+    category VARCHAR(50),            -- Категория (no_answer, success, general)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =================================================================
