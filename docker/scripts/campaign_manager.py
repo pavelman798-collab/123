@@ -396,6 +396,34 @@ async def list_tts_files():
         )
 
 
+@app.get("/api/tts/audio/{filename}")
+async def get_tts_audio(filename: str):
+    """
+    Получить аудио файл из TTS сервиса
+
+    GET /api/tts/audio/message.wav
+    """
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{TTS_SERVICE_URL}/api/tts/audio/{filename}")
+
+            if response.status_code == 200:
+                from fastapi.responses import Response
+                return Response(
+                    content=response.content,
+                    media_type="audio/wav",
+                    headers={"Content-Disposition": f"inline; filename={filename}"}
+                )
+            else:
+                raise HTTPException(status_code=404, detail="Audio file not found")
+
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"TTS service unavailable: {str(e)}"
+        )
+
+
 @app.get("/api/tts/health")
 async def check_tts_health():
     """
