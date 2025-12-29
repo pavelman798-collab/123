@@ -435,8 +435,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const scheduledStartTime = document.getElementById('scheduledStartTime').value;
 
         // Timezone fields
-        const useTimezones = document.getElementById('useTimezones').checked;
         const timezoneMode = document.getElementById('timezoneMode').value;
+        // Автоматически определяем use_timezones по выбранному режиму
+        const useTimezones = (timezoneMode !== 'none');
 
         // Конвертируем локальное время в ISO UTC для отправки на сервер
         let scheduledStartTimeUTC = null;
