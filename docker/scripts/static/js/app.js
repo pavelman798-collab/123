@@ -63,8 +63,9 @@ function showSection(sectionName) {
             break;
         case 'newCampaign':
             loadAudioFilesForCampaign();
-            loadSMSTemplates('no_answer', 'smsNoAnswerTemplate');
-            loadSMSTemplates('success', 'smsSuccessTemplate');
+            // Загружаем все шаблоны для обоих dropdown
+            loadSMSTemplates(null, 'smsNoAnswerTemplate');
+            loadSMSTemplates(null, 'smsSuccessTemplate');
             break;
         case 'tts':
             loadTTSFiles();
@@ -692,19 +693,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Загрузка шаблонов при открытии формы кампании
+    // Загрузка шаблонов при нажатии на кнопку обновления
     const loadTemplatesNoAnswer = document.getElementById('loadTemplatesNoAnswer');
     const loadTemplatesSuccess = document.getElementById('loadTemplatesSuccess');
 
     if (loadTemplatesNoAnswer) {
         loadTemplatesNoAnswer.addEventListener('click', () => {
-            loadSMSTemplates('no_answer', 'smsNoAnswerTemplate');
+            loadSMSTemplates(null, 'smsNoAnswerTemplate');
         });
     }
 
     if (loadTemplatesSuccess) {
         loadTemplatesSuccess.addEventListener('click', () => {
-            loadSMSTemplates('success', 'smsSuccessTemplate');
+            loadSMSTemplates(null, 'smsSuccessTemplate');
         });
     }
 
@@ -766,11 +767,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // Загрузка шаблонов СМС
 async function loadSMSTemplates(category, selectId) {
     try {
-        const url = category ? `${API_BASE}/sms/templates?category=${category}` : `${API_BASE}/sms/templates`;
+        // Загружаем ВСЕ шаблоны, без фильтрации по категории
+        const url = `${API_BASE}/sms/templates`;
         const response = await fetch(url);
         const data = await response.json();
 
         const select = document.getElementById(selectId);
+        if (!select) return; // Если элемент не найден - выходим
 
         // Очищаем и добавляем опцию по умолчанию
         select.innerHTML = '<option value="">-- Выберите шаблон --</option>';
@@ -783,13 +786,10 @@ async function loadSMSTemplates(category, selectId) {
                 option.dataset.text = template.text;
                 select.appendChild(option);
             });
-            showNotification(`Загружено шаблонов: ${data.templates.length}`, 'info');
-        } else {
-            showNotification('Шаблоны не найдены', 'info');
+            // Убрали уведомления - они надоедают
         }
     } catch (error) {
         console.error('Ошибка загрузки шаблонов:', error);
-        showNotification('Ошибка загрузки шаблонов', 'danger');
     }
 }
 
@@ -810,6 +810,10 @@ async function saveSMSTemplate(name, text, category) {
 
         if (response.ok) {
             showNotification('Шаблон сохранен!', 'success');
+
+            // Автоматически перезагружаем оба dropdown после сохранения
+            await loadSMSTemplates(null, 'smsNoAnswerTemplate');
+            await loadSMSTemplates(null, 'smsSuccessTemplate');
         } else {
             throw new Error('Ошибка сохранения шаблона');
         }
