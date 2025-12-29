@@ -113,6 +113,21 @@ async function loadCampaigns() {
                     <h5 class="card-title">${campaign.name}</h5>
                     <p class="card-text text-muted">${campaign.description || 'Без описания'}</p>
 
+                    ${campaign.status === 'scheduled' && campaign.scheduled_start_time ? `
+                        <div class="alert alert-warning mb-3">
+                            <i class="bi bi-clock-history"></i>
+                            <strong>Запланирован запуск:</strong> ${formatDate(campaign.scheduled_start_time)}
+                        </div>
+                    ` : ''}
+
+                    ${campaign.use_timezones ? `
+                        <div class="mb-2">
+                            <span class="badge bg-info">
+                                <i class="bi bi-globe"></i> Часовые пояса: ${campaign.timezone_mode === 'auto' ? 'Автоопределение' : 'Из CSV'}
+                            </span>
+                        </div>
+                    ` : ''}
+
                     <div class="row mt-3">
                         <div class="col-md-3">
                             <small class="text-muted">Всего номеров</small>
@@ -148,6 +163,11 @@ async function loadCampaigns() {
                         ${campaign.status === 'running' ? `
                             <button class="btn btn-sm btn-warning" onclick="event.stopPropagation(); pauseCampaign(${campaign.id})">
                                 <i class="bi bi-pause-fill"></i> Пауза
+                            </button>
+                        ` : ''}
+                        ${campaign.status === 'scheduled' ? `
+                            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); cancelScheduledCampaign(${campaign.id})">
+                                <i class="bi bi-x-circle"></i> Отменить запуск
                             </button>
                         ` : ''}
                         <button class="btn btn-sm btn-info text-white" onclick="event.stopPropagation(); showCampaignDetails(${campaign.id})">
@@ -367,6 +387,27 @@ async function pauseCampaign(campaignId) {
     }
 }
 
+async function cancelScheduledCampaign(campaignId) {
+    if (!confirm('Вы уверены, что хотите отменить запланированный запуск кампании?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/campaigns/${campaignId}/cancel_schedule`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            showNotification('Запланированный запуск отменён', 'info');
+            loadCampaigns();
+        } else {
+            throw new Error('Ошибка отмены');
+        }
+    } catch (error) {
+        showNotification('Ошибка отмены запланированного запуска', 'danger');
+    }
+}
+
 // ============================================
 // Создание кампании
 // ============================================
@@ -389,6 +430,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const smsNoAnswerText = document.getElementById('smsNoAnswerText').value;
         const smsSuccessText = document.getElementById('smsSuccessText').value;
 
+        // Scheduling fields
+        const enableSchedule = document.getElementById('enableSchedule').checked;
+        const scheduledStartTime = document.getElementById('scheduledStartTime').value;
+
+        // Timezone fields
+        const useTimezones = document.getElementById('useTimezones').checked;
+        const timezoneMode = document.getElementById('timezoneMode').value;
+
+        // Конвертируем локальное время в ISO UTC для отправки на сервер
+        let scheduledStartTimeUTC = null;
+        if (enableSchedule && scheduledStartTime) {
+            const localDate = new Date(scheduledStartTime);
+            scheduledStartTimeUTC = localDate.toISOString();
+        }
+
         try {
             // Создаем кампанию
             const createResponse = await fetch(`${API_BASE}/campaigns`, {
@@ -404,7 +460,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     sms_on_no_answer: smsNoAnswerText || null,
                     sms_on_success: smsSuccessText || null,
                     send_sms_on_no_answer: sendSmsOnNoAnswer,
-                    send_sms_on_success: sendSmsOnSuccess
+                    send_sms_on_success: sendSmsOnSuccess,
+                    scheduled_start_time: scheduledStartTimeUTC,
+                    use_timezones: useTimezones,
+                    timezone_mode: timezoneMode
                 })
             });
 
@@ -762,6 +821,49 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // ============================================
+    // Обработчики для запланированного запуска
+    // ============================================
+    const enableSchedule = document.getElementById('enableSchedule');
+    const scheduleTimeSection = document.getElementById('scheduleTimeSection');
+
+    if (enableSchedule) {
+        enableSchedule.addEventListener('change', () => {
+            scheduleTimeSection.style.display = enableSchedule.checked ? 'block' : 'none';
+        });
+    }
+
+    // ============================================
+    // Обработчики для часовых поясов
+    // ============================================
+    const timezoneMode = document.getElementById('timezoneMode');
+    const timezoneDescText = document.getElementById('timezoneDescText');
+    const csvFormatHint = document.getElementById('csvFormatHint');
+
+    const timezoneDescriptions = {
+        'none': 'Все звонки будут совершаться без учета часовых поясов контактов',
+        'manual': 'Часовой пояс будет загружен из CSV файла (столбец "timezone"). Пример: Europe/Moscow, Asia/Vladivostok',
+        'auto': 'Часовой пояс будет автоматически определен по префиксу номера. ⚠️ Это приблизительное определение (по умолчанию Europe/Moscow)'
+    };
+
+    const csvFormatHints = {
+        'none': 'Формат CSV: колонка "phone_number" с номерами в формате 79991234567',
+        'manual': 'Формат CSV: колонки "phone_number" (79991234567) и "timezone" (Europe/Moscow)',
+        'auto': 'Формат CSV: колонка "phone_number" с номерами в формате 79991234567 (timezone определится автоматически)'
+    };
+
+    if (timezoneMode) {
+        timezoneMode.addEventListener('change', () => {
+            const mode = timezoneMode.value;
+            if (timezoneDescText) {
+                timezoneDescText.textContent = timezoneDescriptions[mode];
+            }
+            if (csvFormatHint) {
+                csvFormatHint.textContent = csvFormatHints[mode];
+            }
+        });
+    }
 });
 
 // Загрузка шаблонов СМС
@@ -832,7 +934,8 @@ function getStatusColor(status) {
         'draft': 'info',
         'running': 'success',
         'paused': 'warning',
-        'completed': 'secondary'
+        'completed': 'secondary',
+        'scheduled': 'primary'
     };
     return colors[status] || 'secondary';
 }
@@ -842,7 +945,8 @@ function getStatusText(status) {
         'draft': 'Черновик',
         'running': 'Активна',
         'paused': 'Пауза',
-        'completed': 'Завершена'
+        'completed': 'Завершена',
+        'scheduled': 'Запланирована'
     };
     return texts[status] || status;
 }
