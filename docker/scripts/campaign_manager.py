@@ -251,7 +251,8 @@ async def list_campaigns():
         SELECT id, name, description, status,
                total_numbers, processed_numbers,
                successful_calls, failed_calls,
-               created_at, started_at, completed_at
+               created_at, started_at, completed_at,
+               scheduled_start_time, use_timezones, timezone_mode
         FROM campaigns
         ORDER BY created_at DESC
     """)
@@ -1029,6 +1030,80 @@ async def process_campaign(campaign_id: int):
 
     cur.close()
     conn.close()
+
+
+# ==============================================================================
+# ПЛАНИРОВЩИК - Автоматический запуск запланированных кампаний
+# ==============================================================================
+
+async def check_scheduled_campaigns():
+    """
+    Фоновая задача: проверяет каждую минуту запланированные кампании
+    и запускает их если пришло время
+    """
+    while True:
+        try:
+            conn = get_db()
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            # Найти кампании со статусом 'scheduled' и временем запуска <= NOW()
+            cur.execute("""
+                SELECT id, name, scheduled_start_time
+                FROM campaigns
+                WHERE status = 'scheduled'
+                  AND scheduled_start_time IS NOT NULL
+                  AND scheduled_start_time <= NOW()
+                ORDER BY scheduled_start_time ASC
+            """)
+
+            campaigns_to_start = cur.fetchall()
+
+            if campaigns_to_start:
+                print(f"[Scheduler] Найдено {len(campaigns_to_start)} кампаний для запуска")
+
+            for campaign in campaigns_to_start:
+                campaign_id = campaign['id']
+                campaign_name = campaign['name']
+                scheduled_time = campaign['scheduled_start_time']
+
+                print(f"[Scheduler] Запуск кампании #{campaign_id} '{campaign_name}' (запланировано на {scheduled_time})")
+
+                try:
+                    # Меняем статус на 'running' и записываем started_at
+                    cur.execute("""
+                        UPDATE campaigns
+                        SET status = 'running',
+                            started_at = NOW()
+                        WHERE id = %s
+                    """, (campaign_id,))
+
+                    conn.commit()
+
+                    print(f"[Scheduler] ✅ Кампания #{campaign_id} успешно запущена")
+
+                    # Запускаем процесс обзвона в фоне
+                    asyncio.create_task(process_campaign(campaign_id))
+
+                except Exception as e:
+                    print(f"[Scheduler] ❌ Ошибка запуска кампании #{campaign_id}: {e}")
+                    conn.rollback()
+
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"[Scheduler] Ошибка в планировщике: {e}")
+
+        # Проверять каждые 60 секунд
+        await asyncio.sleep(60)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Запуск фоновых задач при старте приложения"""
+    print("[Startup] Запуск планировщика кампаний...")
+    asyncio.create_task(check_scheduled_campaigns())
+    print("[Startup] ✅ Планировщик запущен (проверка каждые 60 сек)")
 
 
 # ============== RUN ==============
