@@ -39,7 +39,10 @@ CREATE TABLE IF NOT EXISTS campaigns (
     sms_on_success TEXT,             -- Текст СМС при успешном дозвоне
     send_sms_on_no_answer BOOLEAN DEFAULT FALSE,  -- Отправлять ли СМС при недозвоне
     send_sms_on_success BOOLEAN DEFAULT FALSE,    -- Отправлять ли СМС при успешном дозвоне
-    status VARCHAR(20) DEFAULT 'draft',  -- draft, running, paused, completed
+    status VARCHAR(20) DEFAULT 'draft',  -- draft, running, paused, completed, scheduled
+    scheduled_start_time TIMESTAMP,  -- Запланированное время старта (UTC)
+    use_timezones BOOLEAN DEFAULT FALSE,  -- Использовать ли часовые пояса
+    timezone_mode VARCHAR(20) DEFAULT 'none',  -- none, manual, auto
     total_numbers INTEGER DEFAULT 0,
     processed_numbers INTEGER DEFAULT 0,
     successful_calls INTEGER DEFAULT 0,
@@ -48,7 +51,8 @@ CREATE TABLE IF NOT EXISTS campaigns (
     sms_failed INTEGER DEFAULT 0,    -- Количество неудачных СМС
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     started_at TIMESTAMP,
-    completed_at TIMESTAMP
+    completed_at TIMESTAMP,
+    cancelled_at TIMESTAMP           -- Время отмены запланированного запуска
 );
 
 -- Таблица номеров для обзвона
@@ -57,6 +61,7 @@ CREATE TABLE IF NOT EXISTS campaign_numbers (
     campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
     phone_number VARCHAR(20) NOT NULL,
     operator VARCHAR(50),            -- Определенный оператор
+    timezone VARCHAR(50),            -- Часовой пояс контакта (Europe/Moscow, Asia/Yekaterinburg и т.д.)
     status VARCHAR(20) DEFAULT 'pending',  -- pending, calling, answered, busy, failed, no_answer
     sim_used INTEGER,                -- Какая SIM использовалась
     call_attempts INTEGER DEFAULT 0,
@@ -108,6 +113,18 @@ CREATE TABLE IF NOT EXISTS sms_templates (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Таблица информации о префиксах (оператор + часовой пояс + регион)
+CREATE TABLE IF NOT EXISTS phone_prefix_info (
+    id SERIAL PRIMARY KEY,
+    prefix VARCHAR(10) NOT NULL,     -- Префикс номера (910, 920 и т.д.)
+    operator VARCHAR(50) NOT NULL,   -- Оператор (МТС, Билайн, Мегафон, Теле2)
+    timezone VARCHAR(50),            -- Часовой пояс (Europe/Moscow, Asia/Yekaterinburg и т.д.)
+    region VARCHAR(100),             -- Регион
+    utc_offset INTEGER,              -- Смещение от UTC в часах
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(prefix)
+);
+
 -- =================================================================
 -- Начальные данные: диапазоны операторов
 -- =================================================================
@@ -146,6 +163,89 @@ INSERT INTO sim_cards (sim_number, operator, phone_number, status) VALUES
 (2, 'Билайн', NULL, 'disabled'),
 (3, 'Мегафон', NULL, 'disabled'),
 (4, 'Теле2', NULL, 'disabled')
+ON CONFLICT DO NOTHING;
+
+-- Справочник префиксов с часовыми поясами (для автоопределения)
+INSERT INTO phone_prefix_info (prefix, operator, timezone, region, utc_offset) VALUES
+-- МТС (Москва и центральная Россия - UTC+3)
+('910', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('911', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('912', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('913', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('914', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('915', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('916', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('917', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('918', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('919', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('980', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('981', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('982', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('983', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('984', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('985', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('986', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('987', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('988', 'МТС', 'Europe/Moscow', 'Москва', 3),
+('989', 'МТС', 'Europe/Moscow', 'Москва', 3),
+
+-- Билайн (Москва и центральная Россия - UTC+3)
+('903', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('905', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('906', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('909', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('951', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('953', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('960', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('961', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('962', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('963', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('964', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('965', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('966', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('967', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+('968', 'Билайн', 'Europe/Moscow', 'Москва', 3),
+
+-- Мегафон (Москва и центральная Россия - UTC+3)
+('920', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('921', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('922', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('923', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('924', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('925', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('926', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('927', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('928', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('929', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('930', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('931', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('932', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('933', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('934', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('936', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('937', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('938', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+('939', 'Мегафон', 'Europe/Moscow', 'Москва', 3),
+
+-- Теле2 (Москва и центральная Россия - UTC+3)
+('900', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('901', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('902', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('904', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('908', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('950', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('951', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('952', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('953', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('954', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('955', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('958', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('977', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('991', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('992', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('993', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('994', 'Теле2', 'Europe/Moscow', 'Москва', 3),
+('995', 'Теле2', 'Europe/Moscow', 'Москва', 3)
 ON CONFLICT DO NOTHING;
 
 -- =================================================================

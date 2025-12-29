@@ -61,6 +61,9 @@ class Campaign(BaseModel):
     sms_on_success: Optional[str] = None
     send_sms_on_no_answer: bool = False
     send_sms_on_success: bool = False
+    scheduled_start_time: Optional[str] = None  # ISO format datetime string (UTC)
+    use_timezones: bool = False
+    timezone_mode: str = "none"  # none, manual, auto
 
 
 class CampaignNumbers(BaseModel):
@@ -97,6 +100,35 @@ class SMSRequest(BaseModel):
 def get_db():
     """Подключение к БД"""
     return psycopg2.connect(**DB_CONFIG)
+
+
+def detect_timezone_from_phone(phone_number: str, cursor):
+    """
+    Определить часовой пояс по префиксу номера телефона
+
+    Args:
+        phone_number: Номер в формате 79991234567
+        cursor: Database cursor
+
+    Returns:
+        str: Timezone name (e.g. 'Europe/Moscow') или None
+    """
+    # Извлекаем префикс (первые 3 цифры после +7)
+    if len(phone_number) >= 4:
+        prefix = phone_number[1:4]  # 79991234567 -> 999
+
+        # Ищем в справочнике
+        cursor.execute("""
+            SELECT timezone FROM phone_prefix_info
+            WHERE prefix = %s
+            LIMIT 1
+        """, (prefix,))
+
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+
+    return None  # Не найдено - вернём None
 
 
 # ============== ASTERISK AMI ==============
@@ -237,19 +269,33 @@ async def create_campaign(campaign: Campaign):
     conn = get_db()
     cur = conn.cursor()
 
+    # Определяем статус: если указано время старта - scheduled, иначе - draft
+    status = 'scheduled' if campaign.scheduled_start_time else 'draft'
+
+    # Парсим scheduled_start_time из ISO string в datetime если указано
+    scheduled_dt = None
+    if campaign.scheduled_start_time:
+        try:
+            scheduled_dt = datetime.fromisoformat(campaign.scheduled_start_time.replace('Z', '+00:00'))
+        except:
+            scheduled_dt = None
+
     cur.execute("""
         INSERT INTO campaigns (
             name, description, campaign_type, audio_file,
             sms_on_no_answer, sms_on_success,
             send_sms_on_no_answer, send_sms_on_success,
+            scheduled_start_time, use_timezones, timezone_mode,
             status
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'draft')
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
     """, (
         campaign.name, campaign.description, campaign.campaign_type,
         campaign.audio_file, campaign.sms_on_no_answer, campaign.sms_on_success,
-        campaign.send_sms_on_no_answer, campaign.send_sms_on_success
+        campaign.send_sms_on_no_answer, campaign.send_sms_on_success,
+        scheduled_dt, campaign.use_timezones, campaign.timezone_mode,
+        status
     ))
 
     campaign_id = cur.fetchone()[0]
@@ -258,14 +304,16 @@ async def create_campaign(campaign: Campaign):
     cur.close()
     conn.close()
 
-    return {"campaign_id": campaign_id, "status": "created"}
+    return {"campaign_id": campaign_id, "status": status}
 
 
 @app.post("/api/campaigns/{campaign_id}/numbers")
 async def add_numbers(campaign_id: int, file: UploadFile = File(...)):
     """
     Загрузить список номеров из CSV файла
-    Формат CSV: phone_number (одна колонка)
+    Формат CSV:
+    - Обязательная колонка: phone_number
+    - Опциональная колонка: timezone (для timezone_mode='manual')
     """
     contents = await file.read()
     csv_data = io.StringIO(contents.decode('utf-8'))
@@ -273,23 +321,47 @@ async def add_numbers(campaign_id: int, file: UploadFile = File(...)):
     reader = csv.DictReader(csv_data)
     phone_numbers = []
 
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Получаем настройки timezone для кампании
+    cur.execute("""
+        SELECT timezone_mode, use_timezones FROM campaigns WHERE id = %s
+    """, (campaign_id,))
+    campaign_settings = cur.fetchone()
+
+    if not campaign_settings:
+        raise HTTPException(status_code=404, detail="Кампания не найдена")
+
+    timezone_mode, use_timezones = campaign_settings
+
     for row in reader:
-        if 'phone_number' in row:
-            phone_numbers.append(row['phone_number'])
+        if 'phone_number' not in row:
+            continue
+
+        phone = row['phone_number'].strip()
+        timezone = None
+
+        if use_timezones:
+            if timezone_mode == 'manual' and 'timezone' in row:
+                # Режим manual - берём timezone из CSV
+                timezone = row['timezone'].strip() if row['timezone'] else None
+            elif timezone_mode == 'auto':
+                # Режим auto - определяем по префиксу
+                timezone = detect_timezone_from_phone(phone, cur)
+
+        phone_numbers.append((phone, timezone))
 
     if not phone_numbers:
         raise HTTPException(status_code=400, detail="Нет номеров в файле")
 
-    conn = get_db()
-    cur = conn.cursor()
-
     # Добавляем номера
-    for phone in phone_numbers:
+    for phone, tz in phone_numbers:
         cur.execute("""
-            INSERT INTO campaign_numbers (campaign_id, phone_number, status)
-            VALUES (%s, %s, 'pending')
+            INSERT INTO campaign_numbers (campaign_id, phone_number, timezone, status)
+            VALUES (%s, %s, %s, 'pending')
             ON CONFLICT DO NOTHING
-        """, (campaign_id, phone))
+        """, (campaign_id, phone, tz))
 
     # Обновляем счетчик в кампании
     cur.execute("""
@@ -352,6 +424,40 @@ async def pause_campaign(campaign_id: int):
     conn.close()
 
     return {"campaign_id": campaign_id, "status": "paused"}
+
+
+@app.post("/api/campaigns/{campaign_id}/cancel_schedule")
+async def cancel_scheduled_campaign(campaign_id: int):
+    """Отменить запланированный запуск кампании"""
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Проверяем что кампания в статусе scheduled
+    cur.execute("""
+        SELECT status FROM campaigns WHERE id = %s
+    """, (campaign_id,))
+
+    result = cur.fetchone()
+    if not result:
+        raise HTTPException(status_code=404, detail="Кампания не найдена")
+
+    if result[0] != 'scheduled':
+        raise HTTPException(status_code=400, detail="Кампания не запланирована")
+
+    # Отменяем запуск - переводим в draft и очищаем scheduled_start_time
+    cur.execute("""
+        UPDATE campaigns
+        SET status = 'draft',
+            cancelled_at = %s,
+            scheduled_start_time = NULL
+        WHERE id = %s
+    """, (datetime.now(), campaign_id))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"campaign_id": campaign_id, "status": "cancelled", "message": "Запланированный запуск отменён"}
 
 
 @app.get("/api/campaigns/{campaign_id}/stats")
