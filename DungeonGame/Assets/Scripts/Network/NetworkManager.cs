@@ -140,12 +140,12 @@ namespace DarkDungeon.Network
             Debug.Log($"Игроков в комнате: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers}");
         }
 
-        public override void OnPlayerEnteredRoom(Player newPlayer)
+        public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
         {
             Debug.Log($"➤ Игрок присоединился: {newPlayer.NickName} (всего: {PhotonNetwork.CurrentRoom.PlayerCount})");
         }
 
-        public override void OnPlayerLeftRoom(Player otherPlayer)
+        public override void OnPlayerLeftRoom(Photon.Realtime.Player otherPlayer)
         {
             Debug.Log($"➤ Игрок вышел: {otherPlayer.NickName} (осталось: {PhotonNetwork.CurrentRoom.PlayerCount})");
         }
