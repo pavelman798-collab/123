@@ -19,6 +19,15 @@ services:
       - phone-network
     environment:
       - TZ=Europe/Moscow
+    # Лимиты ресурсов
+    deploy:
+      resources:
+        limits:
+          memory: 256M        # Максимум 256MB RAM
+          cpus: '0.5'         # Максимум 50% CPU
+        reservations:
+          memory: 128M        # Резерв 128MB RAM
+          cpus: '0.25'        # Резерв 25% CPU
 
   # PostgreSQL для хранения данных кампаний
   postgres:
@@ -36,6 +45,15 @@ services:
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - phone-network
+    # Лимиты ресурсов
+    deploy:
+      resources:
+        limits:
+          memory: 256M        # Максимум 256MB RAM
+          cpus: '0.5'         # Максимум 50% CPU
+        reservations:
+          memory: 128M        # Резерв 128MB RAM
+          cpus: '0.25'        # Резерв 25% CPU
 
   # Campaign Manager - Python сервис для управления
   campaign-manager:
@@ -62,6 +80,15 @@ services:
       - ASTERISK_AMI_SECRET=asterisk_secret
       - TTS_SERVICE_URL=http://tts-service:5000
       - TZ=Europe/Moscow
+    # Лимиты ресурсов
+    deploy:
+      resources:
+        limits:
+          memory: 256M        # Максимум 256MB RAM
+          cpus: '0.5'         # Максимум 50% CPU
+        reservations:
+          memory: 128M        # Резерв 128MB RAM
+          cpus: '0.25'        # Резерв 25% CPU
 
   # Piper TTS - Генерация голосовых сообщений
   tts-service:
@@ -76,6 +103,15 @@ services:
       - phone-network
     environment:
       - TZ=Europe/Moscow
+    # Лимиты ресурсов (TTS требует больше памяти для моделей)
+    deploy:
+      resources:
+        limits:
+          memory: 512M        # Максимум 512MB RAM (модели TTS)
+          cpus: '1.0'         # Максимум 100% CPU (генерация голоса)
+        reservations:
+          memory: 256M        # Резерв 256MB RAM
+          cpus: '0.5'         # Резерв 50% CPU
 
 networks:
   phone-network:
