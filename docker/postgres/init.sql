@@ -71,10 +71,12 @@ CREATE TABLE IF NOT EXISTS campaign_numbers (
     sms_status VARCHAR(20),          -- pending, sent, failed (статус отправки СМС)
     sms_sent_at TIMESTAMP,           -- Время отправки СМС
     sms_text TEXT,                   -- Текст отправленной СМС
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_campaign_status (campaign_id, status),
-    INDEX idx_phone (phone_number)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Индексы для campaign_numbers
+CREATE INDEX IF NOT EXISTS idx_campaign_status ON campaign_numbers(campaign_id, status);
+CREATE INDEX IF NOT EXISTS idx_phone ON campaign_numbers(phone_number);
 
 -- Таблица логов звонков
 CREATE TABLE IF NOT EXISTS call_logs (
@@ -86,10 +88,12 @@ CREATE TABLE IF NOT EXISTS call_logs (
     status VARCHAR(50),              -- ANSWER, BUSY, NOANSWER, FAILED
     duration INTEGER,
     call_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    error_message TEXT,
-    INDEX idx_call_time (call_time),
-    INDEX idx_campaign (campaign_id)
+    error_message TEXT
 );
+
+-- Индексы для call_logs
+CREATE INDEX IF NOT EXISTS idx_call_time ON call_logs(call_time);
+CREATE INDEX IF NOT EXISTS idx_campaign ON call_logs(campaign_id);
 
 -- Таблица SMS (для будущего функционала)
 CREATE TABLE IF NOT EXISTS sms_log (
