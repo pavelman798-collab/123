@@ -44,6 +44,10 @@ namespace DarkDungeon.Player
 
         private void Update()
         {
+            // Проверка что PhotonView инициализирован
+            if (photonView == null)
+                return;
+
             // Регенерация только для локального игрока
             if (!photonView.IsMine || isDead || !enableHealthRegen)
                 return;
@@ -61,7 +65,7 @@ namespace DarkDungeon.Player
         /// </summary>
         public void TakeDamage(float damage, string attackerName = "Unknown")
         {
-            if (isDead)
+            if (isDead || photonView == null)
                 return;
 
             // Отправляем RPC всем
@@ -75,7 +79,8 @@ namespace DarkDungeon.Player
             currentHealth = Mathf.Max(0, currentHealth);
             lastDamageTime = Time.time;
 
-            Debug.Log($"{photonView.Owner.NickName} получил {damage} урона от {attackerName}. HP: {currentHealth}/{maxHealth}");
+            string playerName = (photonView != null && photonView.Owner != null) ? photonView.Owner.NickName : "Unknown";
+            Debug.Log($"{playerName} получил {damage} урона от {attackerName}. HP: {currentHealth}/{maxHealth}");
 
             // Событие изменения здоровья
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
@@ -106,12 +111,13 @@ namespace DarkDungeon.Player
         /// </summary>
         private void Die(string killerName)
         {
-            if (isDead)
+            if (isDead || photonView == null)
                 return;
 
             isDead = true;
 
-            Debug.Log($"💀 {photonView.Owner.NickName} убит игроком {killerName}");
+            string playerName = (photonView.Owner != null) ? photonView.Owner.NickName : "Unknown";
+            Debug.Log($"💀 {playerName} убит игроком {killerName}");
 
             // Событие смерти
             OnDeath?.Invoke(killerName);
@@ -136,10 +142,11 @@ namespace DarkDungeon.Player
         /// </summary>
         private void Respawn()
         {
-            if (!photonView.IsMine)
+            if (photonView == null || !photonView.IsMine)
                 return;
 
-            Debug.Log($"♻️ {photonView.Owner.NickName} респавнится");
+            string playerName = (photonView.Owner != null) ? photonView.Owner.NickName : "Unknown";
+            Debug.Log($"♻️ {playerName} респавнится");
 
             // Восстанавливаем здоровье
             currentHealth = maxHealth;
