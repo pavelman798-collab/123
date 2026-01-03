@@ -52,9 +52,12 @@ namespace DarkDungeon.Combat
             if (attackPoint == null)
                 attackPoint = transform;
 
-            // По умолчанию бьем игроков и врагов
+            // По умолчанию бьем все (если hitLayers не настроен в Inspector)
             if (hitLayers == 0)
-                hitLayers = LayerMask.GetMask("Player", "Enemy");
+            {
+                hitLayers = ~0; // Все слои
+                Debug.Log("⚠️ Hit Layers не настроены, используем все слои");
+            }
         }
 
         /// <summary>
@@ -67,6 +70,8 @@ namespace DarkDungeon.Combat
 
             if (ownerPhotonView != null && !ownerPhotonView.IsMine)
                 return; // Только локальный игрок атакует
+
+            Debug.Log("🗡️ Атака!");
 
             lastAttackTime = Time.time;
             isAttacking = true;
@@ -112,15 +117,22 @@ namespace DarkDungeon.Combat
             // Находим всех потенциальных врагов в радиусе
             Collider[] hitColliders = Physics.OverlapSphere(attackOrigin, attackRange, hitLayers);
 
+            Debug.Log($"Найдено коллайдеров в радиусе атаки: {hitColliders.Length}");
+
             foreach (Collider hit in hitColliders)
             {
                 // Не атакуем себя
                 if (hit.transform.root == transform.root)
+                {
+                    Debug.Log($"Пропускаем себя: {hit.name}");
                     continue;
+                }
 
                 // Проверяем угол атаки (атакуем только то, что перед нами)
                 Vector3 directionToTarget = (hit.transform.position - attackOrigin).normalized;
                 float angle = Vector3.Angle(attackDirection, directionToTarget);
+
+                Debug.Log($"Цель: {hit.name}, угол: {angle}°, макс угол: {attackAngle}°");
 
                 if (angle <= attackAngle)
                 {
@@ -152,7 +164,13 @@ namespace DarkDungeon.Combat
                     Instantiate(hitEffectPrefab, hitPoint, Quaternion.identity);
                 }
 
-                Debug.Log($"⚔️ Попадание! Урон {damage} по {health.photonView.Owner.NickName}");
+                var targetPV = health.GetComponent<PhotonView>();
+                string targetName = (targetPV != null && targetPV.Owner != null) ? targetPV.Owner.NickName : "Unknown";
+                Debug.Log($"⚔️ Попадание! Нанесен урон {damage} игроку: {targetName}");
+            }
+            else
+            {
+                Debug.Log($"PlayerHealth не найден на цели: {target.name}");
             }
 
             // TODO: Можно добавить поддержку врагов (AI)

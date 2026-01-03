@@ -61,9 +61,13 @@ namespace DarkDungeon.UI
         {
             // Ищем всех игроков
             var players = FindObjectsOfType<Player.PlayerHealth>();
+
+            Debug.Log($"Найдено игроков: {players.Length}");
+
             foreach (var player in players)
             {
-                if (player.photonView.IsMine)
+                var pv = player.GetComponent<Photon.Pun.PhotonView>();
+                if (pv != null && pv.IsMine)
                 {
                     playerHealth = player;
                     playerController = player.GetComponent<Player.FirstPersonController>();
@@ -74,9 +78,19 @@ namespace DarkDungeon.UI
                     playerHealth.OnRespawn += HideDeathScreen;
 
                     Debug.Log("✓ HUD подключен к локальному игроку");
+
+                    // Инициализируем полоски сразу
+                    UpdateHealthBar(playerHealth.Health, playerHealth.MaxHealth);
+                    if (playerController != null)
+                    {
+                        UpdateStaminaBar(playerController.Stamina, playerController.MaxStamina);
+                    }
+
                     return;
                 }
             }
+
+            Debug.Log("Локальный игрок не найден, попытка через 1 сек...");
 
             // Если не нашли - попробуем еще раз через секунду
             Invoke(nameof(FindPlayerComponents), 1f);
