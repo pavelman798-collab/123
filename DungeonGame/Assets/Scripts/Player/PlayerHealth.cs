@@ -208,11 +208,8 @@ namespace DarkDungeon.Player
                 renderer.enabled = false;
             }
 
-            // Включим обратно при респавне
-            if (photonView.IsMine)
-            {
-                Invoke(nameof(EnableRenderers), respawnDelay);
-            }
+            // Включим обратно при респавне для ВСЕХ игроков
+            Invoke(nameof(EnableRenderers), respawnDelay);
         }
 
         private void EnableRenderers()
