@@ -39,10 +39,16 @@ namespace DarkDungeon.UI
 
             // Настраиваем кнопки
             if (createRoomButton != null)
+            {
                 createRoomButton.onClick.AddListener(OnCreateRoomClicked);
+                createRoomButton.interactable = false; // Отключаем пока не подключились
+            }
 
             if (joinRandomRoomButton != null)
+            {
                 joinRandomRoomButton.onClick.AddListener(OnJoinRandomRoomClicked);
+                joinRandomRoomButton.interactable = false; // Отключаем пока не подключились
+            }
 
             if (startGameButton != null)
                 startGameButton.onClick.AddListener(OnStartGameClicked);
@@ -67,6 +73,12 @@ namespace DarkDungeon.UI
         {
             UpdateStatus("Подключено к серверу");
             ShowPanel(lobbyPanel);
+
+            // Включаем кнопки после подключения
+            if (createRoomButton != null)
+                createRoomButton.interactable = true;
+            if (joinRandomRoomButton != null)
+                joinRandomRoomButton.interactable = true;
         }
 
         public override void OnJoinedLobby()
