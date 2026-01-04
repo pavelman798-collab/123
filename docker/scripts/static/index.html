@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление телефонными кампаниями</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <nav class="navbar navbar-dark bg-danger">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-telephone-fill"></i>
+                Телефонные кампании
+            </span>
+            <span class="navbar-text text-white" id="systemStatus">
+                <i class="bi bi-circle-fill text-success pulse"></i> Система активна
+            </span>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <i class="bi bi-list-ul"></i> Меню
+                    </div>
+                    <div class="list-group list-group-flush">
+                        <a href="#" class="list-group-item list-group-item-action active" onclick="showSection('campaigns')">
+                            <i class="bi bi-megaphone"></i> Кампании
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action" onclick="showSection('newCampaign')">
+                            <i class="bi bi-plus-circle"></i> Новая кампания
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action" onclick="showSection('tts')">
+                            <i class="bi bi-mic-fill"></i> Генератор голоса
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action" onclick="showSection('sims')">
+                            <i class="bi bi-sim"></i> SIM-карты
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action" onclick="showSection('stats')">
+                            <i class="bi bi-bar-chart"></i> Статистика
+                        </a>
+                    </div>
+                </div>
+
+                <!-- SIM Cards Status -->
+                <div class="card mt-3">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="bi bi-sim"></i> Статус SIM
+                    </div>
+                    <div class="card-body p-2" id="simCardsWidget">
+                        <div class="text-center">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            <small class="d-block">Загрузка...</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9">
+                <!-- Campaigns List Section -->
+                <div id="campaignsSection" class="content-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2><i class="bi bi-megaphone"></i> Активные кампании</h2>
+                        <button class="btn btn-danger" onclick="showSection('newCampaign')">
+                            <i class="bi bi-plus-lg"></i> Создать кампанию
+                        </button>
+                    </div>
+
+                    <div id="campaignsList">
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-danger" role="status"></div>
+                            <p class="mt-2">Загрузка кампаний...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- New Campaign Section -->
+                <div id="newCampaignSection" class="content-section" style="display: none;">
+                    <h2><i class="bi bi-plus-circle"></i> Новая кампания</h2>
+
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <form id="newCampaignForm">
+                                <div class="mb-3">
+                                    <label for="campaignName" class="form-label">Название кампании</label>
+                                    <input type="text" class="form-control" id="campaignName" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="campaignDescription" class="form-label">Описание</label>
+                                    <textarea class="form-control" id="campaignDescription" rows="3"></textarea>
+                                </div>
+
+                                <!-- Campaign Type Selection -->
+                                <div class="mb-3">
+                                    <label for="campaignType" class="form-label">Тип кампании</label>
+                                    <select class="form-select" id="campaignType" required>
+                                        <option value="call">📞 Позвонить</option>
+                                        <option value="sms">💬 Отправить СМС</option>
+                                        <option value="call_and_sms">📞💬 Позвонить + Отправить СМС</option>
+                                    </select>
+                                </div>
+
+                                <!-- Audio File (for calls) -->
+                                <div class="mb-3" id="audioFileSection">
+                                    <label for="audioFile" class="form-label">Аудиофайл</label>
+                                    <select class="form-select" id="audioFile">
+                                        <option value="">-- Без аудио --</option>
+                                        <option value="" disabled>Загрузка списка...</option>
+                                    </select>
+                                    <small class="form-text text-muted">Выберите файл из сгенерированных или загруженных</small>
+                                </div>
+
+                                <!-- SMS Section -->
+                                <div id="smsSection" style="display: none;">
+                                    <div class="card mb-3">
+                                        <div class="card-header bg-info text-white">
+                                            <i class="bi bi-chat-text"></i> Настройки СМС
+                                        </div>
+                                        <div class="card-body">
+                                            <!-- SMS on No Answer -->
+                                            <div class="mb-3" id="smsNoAnswerSection">
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="sendSmsOnNoAnswer">
+                                                    <label class="form-check-label" for="sendSmsOnNoAnswer">
+                                                        Отправлять СМС при недозвоне
+                                                    </label>
+                                                </div>
+                                                <div id="smsNoAnswerTextSection" style="display: none;">
+                                                    <label for="smsNoAnswerText" class="form-label">Текст СМС при недозвоне</label>
+                                                    <div class="input-group mb-2">
+                                                        <select class="form-select" id="smsNoAnswerTemplate">
+                                                            <option value="">-- Выберите шаблон --</option>
+                                                        </select>
+                                                        <button class="btn btn-outline-secondary" type="button" id="loadTemplatesNoAnswer">
+                                                            <i class="bi bi-arrow-clockwise"></i>
+                                                        </button>
+                                                    </div>
+                                                    <textarea class="form-control" id="smsNoAnswerText" rows="3"
+                                                        placeholder="Здравствуйте! К сожалению, не удалось до вас дозвониться..."></textarea>
+                                                    <button class="btn btn-sm btn-success mt-2" type="button" id="saveTemplateNoAnswer">
+                                                        <i class="bi bi-plus-circle"></i> Сохранить как шаблон
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <!-- SMS on Success -->
+                                            <div class="mb-3" id="smsSuccessSection">
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="sendSmsOnSuccess">
+                                                    <label class="form-check-label" for="sendSmsOnSuccess">
+                                                        Отправлять СМС при успешном дозвоне
+                                                    </label>
+                                                </div>
+                                                <div id="smsSuccessTextSection" style="display: none;">
+                                                    <label for="smsSuccessText" class="form-label">Текст СМС при успешном дозвоне</label>
+                                                    <div class="input-group mb-2">
+                                                        <select class="form-select" id="smsSuccessTemplate">
+                                                            <option value="">-- Выберите шаблон --</option>
+                                                        </select>
+                                                        <button class="btn btn-outline-secondary" type="button" id="loadTemplatesSuccess">
+                                                            <i class="bi bi-arrow-clockwise"></i>
+                                                        </button>
+                                                    </div>
+                                                    <textarea class="form-control" id="smsSuccessText" rows="3"
+                                                        placeholder="Спасибо за звонок! Дополнительная информация..."></textarea>
+                                                    <button class="btn btn-sm btn-success mt-2" type="button" id="saveTemplateSuccess">
+                                                        <i class="bi bi-plus-circle"></i> Сохранить как шаблон
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Scheduled Start Section -->
+                                <div class="card mb-3">
+                                    <div class="card-header bg-warning text-dark">
+                                        <i class="bi bi-clock-history"></i> Запланированный запуск
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="enableSchedule">
+                                            <label class="form-check-label" for="enableSchedule">
+                                                Запустить кампанию в определенное время
+                                            </label>
+                                        </div>
+                                        <div id="scheduleTimeSection" style="display: none;">
+                                            <label for="scheduledStartTime" class="form-label">Дата и время запуска</label>
+                                            <input type="datetime-local" class="form-control" id="scheduledStartTime">
+                                            <small class="form-text text-muted">
+                                                Время указывается в вашем локальном часовом поясе
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Timezone Section -->
+                                <div class="card mb-3">
+                                    <div class="card-header bg-primary text-white">
+                                        <i class="bi bi-globe"></i> Часовые пояса контактов
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label for="timezoneMode" class="form-label">Режим работы с часовыми поясами</label>
+                                            <select class="form-select" id="timezoneMode">
+                                                <option value="none">Без учета часовых поясов</option>
+                                                <option value="manual">Загрузить из CSV (столбец "timezone")</option>
+                                                <option value="auto">Автоопределение по префиксу номера</option>
+                                            </select>
+                                        </div>
+                                        <div id="timezoneDescription" class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i>
+                                            <span id="timezoneDescText">Все звонки будут совершаться без учета часовых поясов контактов</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="numbersFile" class="form-label">Файл с номерами (CSV)</label>
+                                    <input type="file" class="form-control" id="numbersFile" accept=".csv">
+                                    <small class="form-text text-muted" id="csvFormatHint">
+                                        Формат CSV: колонка "phone_number" с номерами в формате 79991234567
+                                    </small>
+                                </div>
+
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="bi bi-save"></i> Создать кампанию
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TTS Section -->
+                <div id="ttsSection" class="content-section" style="display: none;">
+                    <h2><i class="bi bi-mic-fill"></i> Генератор голоса (TTS)</h2>
+
+                    <div class="row mt-3">
+                        <!-- Generator Card -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-danger text-white">
+                                    <i class="bi bi-keyboard"></i> Генерация аудио
+                                </div>
+                                <div class="card-body">
+                                    <form id="ttsForm">
+                                        <div class="mb-3">
+                                            <label for="ttsText" class="form-label">Текст сообщения</label>
+                                            <textarea class="form-control" id="ttsText" rows="4" required
+                                                placeholder="Введите текст для озвучки..."></textarea>
+                                            <small class="text-muted">
+                                                <span id="textLength">0</span> символов
+                                            </small>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label for="ttsVoice" class="form-label">Голос</label>
+                                                <select class="form-select" id="ttsVoice">
+                                                    <option value="ruslan">👨 Руслан (мужской, нейтральный)</option>
+                                                    <option value="dmitri">👨 Дмитрий (мужской, энергичный)</option>
+                                                    <option value="irina">👩 Ирина (женский, мягкий)</option>
+                                                </select>
+                                            </div>
+
+                                            <div class="col-md-6 mb-3">
+                                                <label for="ttsSpeed" class="form-label">
+                                                    Скорость: <span id="speedValue">1.0x</span>
+                                                </label>
+                                                <input type="range" class="form-range" id="ttsSpeed"
+                                                    min="0.5" max="2.0" step="0.1" value="1.0">
+                                                <div class="d-flex justify-content-between">
+                                                    <small class="text-muted">0.5x (медленно)</small>
+                                                    <small class="text-muted">2.0x (быстро)</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label for="ttsFilename" class="form-label">Имя файла (опционально)</label>
+                                            <input type="text" class="form-control" id="ttsFilename"
+                                                placeholder="my_message">
+                                            <small class="text-muted">Расширение .wav будет добавлено автоматически</small>
+                                        </div>
+
+                                        <button type="submit" class="btn btn-danger w-100" id="generateBtn">
+                                            <i class="bi bi-play-circle"></i> Сгенерировать голос
+                                        </button>
+                                    </form>
+
+                                    <div id="ttsResult" class="mt-3" style="display: none;">
+                                        <div class="alert alert-success">
+                                            <i class="bi bi-check-circle"></i>
+                                            <strong>Готово!</strong> Файл создан: <span id="generatedFilename"></span>
+                                            <br>
+                                            <audio controls class="w-100 mt-2" id="audioPlayer">
+                                                <source id="audioSource" type="audio/wav">
+                                                Ваш браузер не поддерживает аудио.
+                                            </audio>
+                                        </div>
+                                    </div>
+
+                                    <div id="ttsError" class="mt-3" style="display: none;">
+                                        <div class="alert alert-danger">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                            <strong>Ошибка:</strong> <span id="errorText"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Generated Files List -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-secondary text-white">
+                                    <i class="bi bi-file-earmark-music"></i> Сгенерированные файлы
+                                    <button class="btn btn-sm btn-light float-end" onclick="loadTTSFiles()">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                </div>
+                                <div class="card-body" id="ttsFilesList" style="max-height: 500px; overflow-y: auto;">
+                                    <div class="text-center">
+                                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                                        <small class="d-block">Загрузка...</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SIM Cards Section -->
+                <div id="simsSection" class="content-section" style="display: none;">
+                    <h2><i class="bi bi-sim"></i> Управление SIM-картами</h2>
+
+                    <div class="row mt-3" id="simCardsList">
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-danger" role="status"></div>
+                            <p class="mt-2">Загрузка SIM-карт...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics Section -->
+                <div id="statsSection" class="content-section" style="display: none;">
+                    <h2><i class="bi bi-bar-chart"></i> Общая статистика</h2>
+
+                    <div class="row mt-3">
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Всего кампаний</h5>
+                                    <h2 class="text-danger" id="totalCampaigns">-</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Активных</h5>
+                                    <h2 class="text-success" id="activeCampaigns">-</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Успешных звонков</h5>
+                                    <h2 class="text-primary" id="totalSuccess">-</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Неудачных</h5>
+                                    <h2 class="text-warning" id="totalFailed">-</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Details Modal -->
+    <div class="modal fade" id="campaignModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="campaignModalTitle">Детали кампании</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="campaignModalBody">
+                    <!-- Содержимое загружается динамически -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+services:
+  # Asterisk PBX для работы с GoIP-4
+  asterisk:
+    build: ./docker/asterisk
+    container_name: phone-asterisk
+    restart: unless-stopped
+    # Используем host network для прямого доступа GoIP к Asterisk
+    network_mode: host
+    volumes:
+      - ./docker/asterisk/etc:/etc/asterisk
+      - ./docker/asterisk/sounds:/var/lib/asterisk/sounds/custom
+      - ./docker/asterisk/agi:/var/lib/asterisk/agi-bin
+      - ./logs:/var/log/asterisk
+      - ./audio:/audio
+    environment:
+      - TZ=Europe/Moscow
+    # Лимиты ресурсов
+    deploy:
+      resources:
+        limits:
+          memory: 256M        # Максимум 256MB RAM
+          cpus: '0.5'         # Максимум 50% CPU
+        reservations:
+          memory: 128M        # Резерв 128MB RAM
+          cpus: '0.25'        # Резерв 25% CPU
+
+  # PostgreSQL для хранения данных кампаний
+  postgres:
+    image: postgres:15-alpine
+    container_name: phone-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: phone_campaigns
+      POSTGRES_USER: phone_user
+      POSTGRES_PASSWORD: phone_pass_2024
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - phone-network
+    # Лимиты ресурсов
+    deploy:
+      resources:
+        limits:
+          memory: 256M        # Максимум 256MB RAM
+          cpus: '0.5'         # Максимум 50% CPU
+        reservations:
+          memory: 128M        # Резерв 128MB RAM
+          cpus: '0.25'        # Резерв 25% CPU
+
+  # Campaign Manager - Python сервис для управления
+  campaign-manager:
+    build: ./docker/scripts
+    container_name: phone-campaign-manager
+    restart: unless-stopped
+    depends_on:
+      - asterisk
+      - postgres
+      - tts-service
+    ports:
+      - "8000:8000"  # API для управления
+    volumes:
+      - ./docker/scripts:/app
+      - ./audio:/audio
+      - ./logs:/logs
+    networks:
+      - phone-network
+    environment:
+      - DATABASE_URL=postgresql://phone_user:phone_pass_2024@postgres:5432/phone_campaigns
+      - ASTERISK_HOST=host.docker.internal  # Asterisk в host network
+      - ASTERISK_AMI_PORT=5038
+      - ASTERISK_AMI_USER=admin
+      - ASTERISK_AMI_SECRET=asterisk_secret
+      - TTS_SERVICE_URL=http://tts-service:5000
+      - TZ=Europe/Moscow
+    # Лимиты ресурсов
+    deploy:
+      resources:
+        limits:
+          memory: 256M        # Максимум 256MB RAM
+          cpus: '0.5'         # Максимум 50% CPU
+        reservations:
+          memory: 128M        # Резерв 128MB RAM
+          cpus: '0.25'        # Резерв 25% CPU
+
+  # Piper TTS - Генерация голосовых сообщений
+  tts-service:
+    build: ./docker/tts
+    container_name: phone-tts
+    restart: unless-stopped
+    ports:
+      - "5000:5000"  # TTS API
+    volumes:
+      - ./audio:/audio
+    networks:
+      - phone-network
+    environment:
+      - TZ=Europe/Moscow
+    # Лимиты ресурсов (TTS требует больше памяти для моделей)
+    deploy:
+      resources:
+        limits:
+          memory: 512M        # Максимум 512MB RAM (модели TTS)
+          cpus: '1.0'         # Максимум 100% CPU (генерация голоса)
+        reservations:
+          memory: 256M        # Резерв 256MB RAM
+          cpus: '0.5'         # Резерв 50% CPU
+
+networks:
+  phone-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

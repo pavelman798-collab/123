@@ -1,0 +1,259 @@
+/* ========================================
+   Стили для системы телефонных кампаний
+   Цветовая схема: МТС (красный)
+   ======================================== */
+
+:root {
+    --mts-red: #E30611;
+    --mts-red-hover: #C5050C;
+    --success-green: #28A745;
+    --warning-yellow: #FFC107;
+    --danger-red: #DC3545;
+}
+
+body {
+    background-color: #F5F5F5;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Navbar */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Cards */
+.card {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    border: none;
+}
+
+.card-header {
+    border-radius: 8px 8px 0 0 !important;
+    font-weight: 600;
+}
+
+/* Buttons */
+.btn-danger {
+    background-color: var(--mts-red);
+    border-color: var(--mts-red);
+}
+
+.btn-danger:hover {
+    background-color: var(--mts-red-hover);
+    border-color: var(--mts-red-hover);
+}
+
+/* Campaign Card */
+.campaign-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.campaign-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.campaign-status-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+/* Progress bars */
+.progress {
+    height: 8px;
+    border-radius: 4px;
+}
+
+/* SIM Card Widget */
+.sim-card-mini {
+    padding: 8px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--mts-red);
+    background: white;
+    border-radius: 4px;
+}
+
+.sim-card-mini.disabled {
+    border-left-color: #6C757D;
+    opacity: 0.6;
+}
+
+.sim-card-mini.blocked {
+    border-left-color: var(--danger-red);
+}
+
+/* SIM Card Full */
+.sim-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.sim-card-operator {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* Stats */
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Pulse animation for status indicator */
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* List group active item */
+.list-group-item-action.active {
+    background-color: var(--mts-red);
+    border-color: var(--mts-red);
+}
+
+.list-group-item-action:hover {
+    background-color: #F8F9FA;
+}
+
+/* Content sections */
+.content-section {
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Status badges */
+.status-running {
+    background-color: var(--success-green);
+}
+
+.status-paused {
+    background-color: var(--warning-yellow);
+}
+
+.status-completed {
+    background-color: #6C757D;
+}
+
+.status-draft {
+    background-color: #17A2B8;
+}
+
+/* File upload area */
+.file-upload-area {
+    border: 2px dashed #CCC;
+    border-radius: 8px;
+    padding: 40px;
+    text-align: center;
+    transition: border-color 0.3s;
+}
+
+.file-upload-area:hover {
+    border-color: var(--mts-red);
+}
+
+.file-upload-area.drag-over {
+    border-color: var(--mts-red);
+    background-color: #FFE5E7;
+}
+
+/* Call status icons */
+.call-status-icon {
+    font-size: 1.2rem;
+}
+
+.call-status-answered {
+    color: var(--success-green);
+}
+
+.call-status-failed {
+    color: var(--danger-red);
+}
+
+.call-status-pending {
+    color: var(--warning-yellow);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .stat-number {
+        font-size: 2rem;
+    }
+
+    .campaign-card {
+        margin-bottom: 15px;
+    }
+}
+
+/* Loading spinner */
+.spinner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+/* Toast notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+}
+
+/* Campaign actions */
+.campaign-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.campaign-actions .btn {
+    padding: 4px 12px;
+    font-size: 0.875rem;
+}
+
+/* Operator colors */
+.operator-mts {
+    color: #E30611;
+}
+
+.operator-beeline {
+    color: #FFCC00;
+}
+
+.operator-megafon {
+    color: #00B956;
+}
+
+.operator-tele2 {
+    color: #000000;
+}
