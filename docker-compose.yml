@@ -4,14 +4,19 @@ services:
     build: ./docker/asterisk
     container_name: phone-asterisk
     restart: unless-stopped
-    # Используем host network для прямого доступа GoIP к Asterisk
-    network_mode: host
+    ports:
+      - "5060:5060/udp"    # SIP UDP (основной)
+      - "5060:5060/tcp"    # SIP TCP (резерв)
+      - "10000-10099:10000-10099/udp"  # RTP (аудио)
+      - "5038:5038"        # AMI (Asterisk Manager Interface)
     volumes:
       - ./docker/asterisk/etc:/etc/asterisk
       - ./docker/asterisk/sounds:/var/lib/asterisk/sounds/custom
       - ./docker/asterisk/agi:/var/lib/asterisk/agi-bin
       - ./logs:/var/log/asterisk
       - ./audio:/audio
+    networks:
+      - phone-network
     environment:
       - TZ=Europe/Moscow
     # Лимиты ресурсов
@@ -69,7 +74,7 @@ services:
       - phone-network
     environment:
       - DATABASE_URL=postgresql://phone_user:phone_pass_2024@postgres:5432/phone_campaigns
-      - ASTERISK_HOST=host.docker.internal  # Asterisk в host network
+      - ASTERISK_HOST=asterisk
       - ASTERISK_AMI_PORT=5038
       - ASTERISK_AMI_USER=admin
       - ASTERISK_AMI_SECRET=asterisk_secret
