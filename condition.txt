@@ -1,0 +1,1754 @@
+﻿⇒Молчание, ошибки ASR_TTS
+
+
+(card.containsKey("VOICE") && card["VOICE"] in ["NO_INPUT","NO_ASRTTS","NO_MATCH","TIMEOUT"])
+&&
+(!card.containsKey("pred_neinteresno"))  
+
+
+⇒Счетчик ПИН
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счетчик")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счётчик")} != null)
+
+
+⇒PIN
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("пин код")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains(" пин ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("PIN")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("pin")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains(" пин")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("пин ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("неактив")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не актив")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("активи")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("активац")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("активиз")} != null) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("станов")} != null) && ((card.find{key, value -> key.startsWith("VOICE") && value.contains("пин")} != null) ||  (card.find{key, value -> key.startsWith("VOICE") && value.contains("код")} != null))) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("пароль")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("код")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("выдал")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("получил")} != null)))
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("есим")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("ваучер")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("е семь")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("подписк")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("закрыть")} != null)
+
+
+⇒ОМТ
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("телефон")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("номер")} != null)) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("обнов")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("новый")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("новом")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("привяз")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подтвер")} != null))) ||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("мени")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("менял")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("меняю")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мена")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("передел")} != null) ||  
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("менят")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("менен")} != null)) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("номер")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("телеф")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("основ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("оэртэ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("оэмтэ")} != null))) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("подтвер")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("заявл")} != null)) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("идентифи")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("интенсифи")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индефик")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индетифи")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("дентифик")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("иденцифик")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("данте фиксац")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("верифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("аутентифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("аунтифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ауентифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индевик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индифифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("этонтифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("антифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("аутифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("пентифик")} != null) ||  
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("динтифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("нификац")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индиентифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("идентик")} != null) ||  
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("инвентофик")} != null) ||  
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индистифик")} != null) ||  
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("дендифик")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("модификац")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("эдентифик")} != null) ||  
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("инде тификац")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ден тификац")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("денти фик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("авторизац")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("дефикац")} != null) ||   
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индатифик")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("иддифик")} != null) ||  
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индентифик")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индистифик")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("инвестикац")} != null) ||   
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("индисфик")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("инициализыц")} != null) ||   
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("инвертифик")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("энден дефикац")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вертификац")} != null) ||   
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("дефекац")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("интентифик")} != null) ||  
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("инве тификацию")} != null) 
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("приложен")} != null)
+
+
+
+⇒Страховка
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("страх")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ренесанс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("защит")} != null)
+
+
+⇒Баланс карты
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("баланс")} != null) ||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("остаток")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сколько")} != null)) 
+&&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("средств")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains(" на ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("денег")} != null)) 
+&&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null)|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null))))
+&& 
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим карт")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим-карт")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("симк")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("пополнит")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("положить")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("стим")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("накоп")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("вклад")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("склад")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("ежеднев")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("перевес")} != null))
+
+
+⇒Увеличить лимит	
+
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("лимит")} != null) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("увел")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("повы")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("добав")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("пополн")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подн")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("продл")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("повыс")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подключ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("расш")} != null))) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("увел")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("кред")} != null)))
+&& 
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains(" не ")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains(" нет ")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("нет ")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains(" нет")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("не ")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains(" не")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("нехочу")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("неверно")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("неправильно")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("видан")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("безлимит")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("интернет")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("трафик")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("перевод")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("снят")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("гигаб")} != null))
+
+
+
+⇒Уменьшить лимит
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("лимит")} != null) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("умень")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("убрать")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("пони")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сниз")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("отмен")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сброс")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не нуж")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("убав")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сокр")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("опуст")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("отключ")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вернут")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("прежн")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сниж")} != null)))
+&& 
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("безлимит")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("интернет")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("перевод")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("снят")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("трафик")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("гигаб")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("повыс")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим")} != null))
+
+
+
+⇒Изменить кредитный лимит
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("лимит")} != null) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("изм")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("помен")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("станов")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("остав")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("увелич")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сохран")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мтс")} != null)))
+&& 
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("безлимит")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("интернет")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("трафик")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("гигаб")} != null))
+
+
+⇒Узнать кредитный лимит + остаток
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("лимит")} != null) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("какой")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("узнать")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сколько")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("понят")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("уточнит")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null))) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("доступ")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("остаток")} != null)) ||
+(card.containsKey("VOICE") && card["VOICE"] == "лимит"))
+&& 
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("безлимит")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("интернет")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("перевод")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("снят")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("трафик")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("гигаб")} != null))
+
+
+⇒Блок
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("блок")} != null) && 
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("питани")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("заряд")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("номер")} != null)))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("подозрител")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("актив")} != null))
+
+
+⇒Разблокировка
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("разблок")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("номер")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("закрыть")} != null)
+
+
+⇒Блокировка или закрытие
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("блок")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("питани")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("заряд")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("номер")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("донат")} != null)
+
+
+⇒Закрытие
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("удали")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("отключ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("закр")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("отказ")} != null)|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("аннул")} != null))
+&&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null))
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("услуг")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("оповеще")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сообще")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("смс")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("sms")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("уведомлен")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("справк")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("автоплат")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("премиум")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("подписк")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим-карт")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("страх")} != null)
+
+
+⇒Заявка, обращение
+
+
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("заявк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("обращен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("претенз")} != null)) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("реструктур")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("лимит")} != null)&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("отсрочк")} != null)&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("каникул")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("интернет")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("телеви")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("вклад")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("клад")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("склад")} != null)
+
+
+⇒Перевыпуск карты
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("перевыпус")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("переоткр")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null)
+&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим")} != null)
+
+
+⇒Карта UnionPay
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("юнион")} != null)
+
+
+⇒МБ/FIX/SPUTNIK
+
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("ошиб")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null))
+&&
+((!card.containsKey("APPHIS_SUBJECT_1")) || ((card.containsKey("APPHIS_SUBJECT_1") && card["APPHIS_SUBJECT_1"] != "Перевод звонка") && (card.containsKey("APPHIS_SUBSUBJECT_1") && card["APPHIS_SUBSUBJECT_1"] != "Мобильный бизнес МТС")))
+&&
+(!card.containsKey("Predl_perevod"))) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("стационарн")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("антенн")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сотовая связь")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не ловит")} != null) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("интернет")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("банк")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("абонен")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плата")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("тариф")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("связ")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("телефон")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("номер")} != null)) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("гигаб")} != null) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("связ")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("специалист")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("оператор")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("мобил")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("связ")} != null)) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("телевизор")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сим карт")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сим-карт")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("симк")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("турбо")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("дополнительный пакет минут")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("обновить пакет")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("роуминг")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("спутник")} != null) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("обещ")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("доверит")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null)) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("тарелк")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("приставк")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мастер")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("канал")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кабел")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("телевиден")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("роутер")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("домашн")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("провод")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кион")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("kion")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("премиум")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("premium")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("wifi")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("wi-fi")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вай фай")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вай-фай")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("гудок")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("goodok")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("забугорищ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("tv")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("тикетлэнд")} != null) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("мтс")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("связ")} != null)) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("расторг")} != null) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("закрыт")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("счет")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("счёт")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("iphone")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("айфон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("xiaomi")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сяоми")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("samsung")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("самсунг")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("наушник")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("зарядк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("зарядн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("чехл")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("чехол")} != null) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("умная")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("колонк")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("алиса")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("колонк")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("блок")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("питан")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("интернет")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("магазин")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("купить")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("телефон")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("купить")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("смартфон")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("купить")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("планшет")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("наличии")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("телефон")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("наличии")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("смартфон")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("наличии")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("планшет")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("наличие")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("телефон")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("наличие")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("смартфон")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("наличие")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("планшет")} != null))) &&
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("кредит")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("карт")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("приложени")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("рассрочк")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("процент")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("банк")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("вклад")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("мтс банк")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("оператор")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("специалист")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("склад")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("кредитк")} != null)) ||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("мтс накопления")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("накопление мтс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мтс накопление")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("накопления мтс")} != null))
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("склад")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("вклад")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("счет")} != null))
+
+
+
+⇒МСБ
+
+(
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("крипт")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("ключ")} != null)) || ((card.find{key, value -> key.startsWith("VOICE") && value.contains("юр")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("лиц")} != null)) || ((card.find{key, value -> key.startsWith("VOICE") && value.contains("валют")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("контрол")} != null)) || ((card.find{key, value -> key.startsWith("VOICE") && value.contains("юр")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("отдел")} != null)) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("расчёт")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("бизнес")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("корпоратив")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("эквайринг")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("экваринг")} != null) ||(card.find{key, value -> key.startsWith("VOICE") && value.contains("эйкваринг")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("предпринимат")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("касс")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("внешнеэкономич")} != null) || ((card.find{key, value -> key.startsWith("VOICE") && value.contains("клиент банк")} != null) && (card.find{key, value -> key.startsWith("VOICE") && !value.contains("банка")} != null))
+)
+&&
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("физическ")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("частн")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("физлиц")} != null))   
+
+
+
+⇒Кредитные каникулы
+
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("каник")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("реструктур")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("отсроч")} != null)||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("измени")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("дату")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("платеж")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("нет")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("возможнос")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("перен")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("дат")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("отдых")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("финанс")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("трудно")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("приост")} != null))
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("мошен")} != null) 
+
+
+
+⇒Просроченная задолженность
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("просроч")} != null) || ((card.find{key, value -> key.startsWith("VOICE") && value.contains("отдел")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("задолж")} != null)) || ((card.find{key, value -> key.startsWith("VOICE") && value.contains("отдел")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("взыскани")} != null))	
+
+
+
+⇒Справки и выписки
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("справк")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("выписк")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("накоп")} != null) 
+
+
+⇒Остаток (ПДП)
+
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("остат")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("остал")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("должен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("гаси")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("гаше")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("досроч")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("полнос")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("полное")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("частич")} != null) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("сколько")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("ещё")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("закрыт")} != null) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("рассроч")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ипотек")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("долг")} != null))) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("долг")} != null) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("сумм")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("како")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("размер")} != null))))
+&& ((card.find{key, value -> key.startsWith("VOICE") && !value.contains("продолж")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("достато")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("откуда")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("почему")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("осталис")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("остальн")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("накоп")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("вклад")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("склад")} != null)))
+||
+(card.containsKey("VOICE") && card["VOICE"] in ["долг"])
+
+
+⇒Закрытие счёта
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("закрыт")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("закрыт")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null))
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("склад")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("вклад")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("накоп")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("сберег")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("процент")} != null)
+
+
+
+⇒Ежемесячный платеж
+
+
+((((card.find{key, value -> key.startsWith("VOICE") && value.contains("платёж")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("платеж")} != null)) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("автоплат")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("систем")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("поручен")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("ошибочн")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("стикер")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("адрес")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("зарубеж")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("сколько")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("сколько")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("внест")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("когда")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("дат")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("какой")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("сумм")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("размер")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null)))
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("накоп")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("вклад")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("склад")} != null)
+
+
+
+⇒Номер договора, счёта
+
+
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("реквизи")} != null) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("номер")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("номер")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("номер")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("договор")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null)&&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("номер")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("реквизи")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("инфо")} != null))))
+&& 
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("телеф")} != null)&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("прилож")} != null)&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("кабинет")} != null)&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("онлайн")} != null)&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("банк")} != null)&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("смс")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("информировани")} != null)&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("возвра")} != null)&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("ошиб")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("не пришл")} != null)&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("не отображ")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("помен")} != null)&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("смен")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("срок")} != null)&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("не могу перевести")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("не могу оплат")} != null)&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("не могу полож")} != null)&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сумм")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("замен")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("операц")} != null)&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("мошен")} != null)))
+
+
+⇒Способы оплаты
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("кред")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("рассроч")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null))) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("пополн")} != null) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("кред")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("рассроч")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null))) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("плат")} != null) && (card.find{key, value -> key.startsWith("VOICE") && !value.contains(" ")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("пополн")} != null) && (card.find{key, value -> key.startsWith("VOICE") && !value.contains(" ")} != null))
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("накоп")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("вклад")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("склад")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("автоплат")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("сим")} != null)
+&& (card.find{key, value -> key.startsWith("VOICE") && !value.contains("стим")} != null)
+
+
+⇒Аресты
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("арест")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("пристав")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("взыск")} != null) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("исполнит")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("лимит")} != null))
+
+
+
+⇒ГОП
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("статус")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("претен")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("статус")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("обращ")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("ответ")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("обращ")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("ответ")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("претен")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("результ")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("претен")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("результ")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("обращ")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("вопрос")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("обращ")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("вопрос")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("претен")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("решен")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("претен")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("решен")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("обращ")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("подат")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("жалоб")} != null))
+
+
+
+
+⇒Ипотека
+
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ипотек")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("ипотеч")} != null)
+
+
+
+
+⇒Спам
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("абонент временно")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("аппарат абонента")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("поставил звонок на удержание")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("поставил вызов на удержание")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("оставайтесь на линии")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("пожалуйста перезвоните в ситибанк по телефону восемь восемьсот семьсот семь семь пять пять звонок на территории россии бесплатный")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("вы являетесь партнёрами совкомбанка карта халва")} != null)||(card.find{key, value -> key.startsWith("VOICE") && value.contains("выключен или находится вне зоны")} != null)||(card.find{key, value -> key.startsWith("VOICE") && value.contains("вызываемый вами абонент")} != null) ||(card.find{key, value -> key.startsWith("VOICE") && value.contains("разговор будет продолжен")} != null)||(card.find{key, value -> key.startsWith("VOICE") && value.contains("поставила вызов на удержание")} != null) ||(card.find{key, value -> key.startsWith("VOICE") && value.contains("кого будет продолжен")} != null) ||(card.find{key, value -> key.startsWith("VOICE") && value.contains("пожалуйста перезвоните в ситибанк")} != null) ||(card.find{key, value -> key.startsWith("VOICE") && value.contains("я использую помощник")} != null) 
+
+
+
+
+⇒Пропущенный звонок от банка
+
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("мне")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("звон")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("на мой")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("звон")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("вы")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("звон")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("пропущ")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("вас")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("пропущ")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("выз")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("пропущ")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("звон")} != null))|| 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("поступил")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("звон")} != null)) ||
+(card.containsKey("VOICE") && card["VOICE"] == "звонили") ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вы кто")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("это кто")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кто это")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ты кто")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мне звон")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кто вы")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кто ты")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ты кто")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кто звон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("куда попал")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("откуда звон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("куда я позвон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("был звон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("куда позвон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("куда звон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("с кем")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("был звонок")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("звонок от вас")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("почему звон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кто вообще")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("куда я позвон")} != null)) 
+&&
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("мошенни")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("аферист")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("жулик")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("кредит")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("оформ")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("плат")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("карт")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("счет")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("жалов")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("жалоб")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("перев")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("присл")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("ден")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("смен")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("измен")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("менял")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("нов")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("меняю")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("мена")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("менят")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("менен")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("искл")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("убрат")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("нужн")} != null) &&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("соедин")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("откл")} != null))
+
+
+
+⇒Статус заявки на кредит/карту
+
+
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("досроч")} != null) &&
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("одобр")} != null) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("заявк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("курьер")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("достав")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("рассроч")} != null))) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("одобрен ли")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кред")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("заявк")} != null) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("статус")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("проверить")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("решен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ответ")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вопрос")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("узнать")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null)))||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("получени")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("получить")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("выдач")} != null)) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null)) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("номер")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("код")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("деньг")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("наличн")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("справк")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("консульт")} != null)) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("доставк")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("заказ")} != null)&&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null))||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("достав")} != null)&&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("курьер")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null)))
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("мошен")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("накоп")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("вклад")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("склад")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сберег")} != null)
+
+
+
+⇒Оформить карту
+
+
+(
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("кредитн")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("кредитн")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("оформ")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("оформ")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("как")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("получит")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null)) || 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("откр")} != null))
+) &&
+(!(card["VOICE"] in ["кредитная карта", "карта", "вопрос по кредитной карте", "вопрос по карте", "дебетовая карта", "пластиковая карта", "кредитные карты", "дебетовые карты", "виртуальная карта", "по карте", "информация по карте", "карта мтс", "дебетовые карты", "дебетовая карта", "карты", "карту", "с карты", "вопрос по дебетовой карте", "по поводу карты", "карта мтс банка"]))
+&&
+(!card.containsKey("oform_card")
+)
+&&
+(!card.containsKey("оформить.карту_for_grafana")
+)  
+
+
+⇒Оформить кредит
+
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("рассроч")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null)) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("взят")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("хоч")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("получ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("оформ")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("одобр")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("нужен")} != null) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("пода")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("заявк")} != null))))
+||
+(card.containsKey("VOICE") && card["VOICE"] == "кредит наличными") || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("рефин")} != null)
+&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("мошенн")} != null)
+
+
+
+⇒Отключить услуги
+
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("будь в курсе")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("информир")} != null)
+)
+|| 
+(
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("отключ")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("отказ")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("платн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("отмен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не нужн")} != null)
+) 
+&&
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("смс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сообще")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("услуг")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("уведом")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("оповещ")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подписк")} != null)
+)
+)
+&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("айклауд")} != null)
+&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("мошенн")} != null)
+&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("включить")} != null)
+
+
+⇒Вклады
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("вклад")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("клад")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("тринадцать процентов")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("пятнадцать процентов")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("депозит")} != null) 
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("лады")} != null) 
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("накопит")} != null) 
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сберегат")} != null) 
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("наличн")} != null) 
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("заказ")} != null) 
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("взять")} != null) 
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вывести")} != null) 
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("забрать")} != null) 
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мтс счёт")} != null) 
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мтс счет")} != null) 
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ежедневный остаток")} != null) 
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ежемесячный остаток")} != null)) 
+&& 
+(((card.find{key, value -> key.startsWith("VOICE") && !value.contains("внес")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("карт")} != null))
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("забра")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("кредит")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("валют")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("комисс")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("кэшбэк")} != null))
+||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("процент")} != null) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("ставк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("расчет")} != null)))
+||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("условия")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ставк")} != null)) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null)))
+||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("открыть")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("открытие")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("открываю")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("открытия")} != null)) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null)))
+||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("текущ")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("написательн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ежедневн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("покопительн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ительному")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("отопительный")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("накопит")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("накопичн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("копеечный")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("покоительному")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("закопительному")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счетному")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("копительный")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("лидинный")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("накоплен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("окопительному")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("оттопительный")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("потопительный")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("обоительный")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("победный")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сбер")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("обратительный")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карательный")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("покрепительн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ильному")} != null)) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null)))
+||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("преверственн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("приветсвенн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("понизил")} != null)) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ставк")} != null))
+||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("семнадцать")} != null) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("процент")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("годовых")} != null)))
+||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("семнадцать")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ежеднев")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("повышен")} != null)) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("процент")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("годовых")} != null)))
+||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("короткий")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("срок")} != null)) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null)))
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("провангация")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("пролонг")} != null)
+
+
+
+
+⇒Кэшбэк
+
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кэш")} != null)
+
+
+⇒Мошенничество
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("аферист")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мошенни")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("машинни")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("взлом")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("взлам")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("жулики")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подозр")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("украл")} != null) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("служб")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("безоп")} != null))
+
+
+⇒Изменение ПД
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("мен")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("пасп")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("нов")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("пасп")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("обнов")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("пасп")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("обнов")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("фам")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("обнов")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("данн")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("мен")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("фам")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("подтвер")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("данн")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("нов")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("фам")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("мен")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("перс")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("нов")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("перс")} != null)) 
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("приложение")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("менеджер")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("госпош")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("систем")} != null)
+
+
+
+⇒Денежные переводы
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("перевести")} != null) ||
+ ((card.find{key, value -> key.startsWith("VOICE") && value.contains("золот")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("корон")} != null)) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("перевод")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("перевела")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("перевёл")} != null)) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("спец")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("сотрудник")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("оператор")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("менеджер")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("консультант")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("поддержк")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("человек")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("отдел")} != null)
+
+
+⇒Разблокировать/заблокировать приложение
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("блок")} != null) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("личный кабинет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("приложен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("предложен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кабинет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("номер")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("банк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кошел")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вход")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("предложение")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("деньги")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("онлайн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("телефон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("снять")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("платеж")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сумм")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("тысяч")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("профил")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подозрител")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сервис")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("запись")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("интернет банк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("онлайн банк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("аккаунт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мтс банк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("средства")} != null) ||
+ (card.find{key, value -> key.startsWith("VOICE") && value.contains("операции")} != null))
+
+
+⇒Разблокировать/заблокировать приложение
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("блок")} != null) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("личный кабинет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("приложен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("предложен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кабинет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("номер")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("банк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кошел")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вход")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("предложение")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("деньги")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("онлайн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("телефон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("снять")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("платеж")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сумм")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("тысяч")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("профил")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подозрител")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сервис")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("запись")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("интернет банк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("онлайн банк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("аккаунт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мтс банк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("средства")} != null) ||
+ (card.find{key, value -> key.startsWith("VOICE") && value.contains("операции")} != null))
+
+
+⇒Проблемы со входом в личный кабинет
+
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("не могу")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не можем")} != null) ||  
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("нет доступа")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("доступ")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("проблема")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ошибк")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вход")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("висит")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("завис")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("восстан")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не пуска")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не заходит")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не удаётся")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не получается")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не работает")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не входит")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не доступен")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("некорректно")} != null) ||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("не приш")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не прис")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не прих")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не отправ")} != null)) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("sms")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("смс")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сообщен")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("парол")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("код")} != null))))
+&&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("личный кабинет")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сайт")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("интернет банк")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("онлайн банк")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("приложени")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("предложен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("онлайнбанк")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("банк")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("интернетбанк")} != null)))
+||
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("не отобр")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("неотобр")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не виж")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("отраж")} != null)||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("исчезл")} != null) &&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("деньги")} != null))) &&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null))
+&&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("банкомат")} != null)
+
+
+⇒Курс и обмен валюты
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("валют")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("доллар")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("евро")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains(" курс ")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains(" сша ")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains(" США ")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("юан")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("дирхам")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("ваучер")} != null)
+
+
+⇒Льготный период
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("льгот")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("период")} != null)) ||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("беспроцент")} != null) && (card.find{key, value -> key.startsWith("VOICE") && value.contains("период")} != null))
+
+
+⇒Комиссия
+
+
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("обслуж")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null)
+)
+||
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("год")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("обслуж")} != null)
+)
+||
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мес")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("обслуж")} != null)
+)
+||
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мес")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("комис")} != null)
+)
+||
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("год")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("комис")} != null)
+)
+||
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("обслуж")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("комис")} != null)
+)
+
+
+⇒Условия по карте
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null)
+&&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("услов")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("комисс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("обслужи")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подроб")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("тариф")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("характерис")} != null))
+
+
+
+⇒Чат с оператором
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("чат ")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains(" чат")} != null)
+
+
+
+⇒Ошибка в имени
+
+
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("меня")} != null)
+&&
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("зовут")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("звать")} != null)
+)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не ")} != null)
+)
+||
+(
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мое")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("моё")} != null)
+)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("имя")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не ")} != null)
+)
+
+
+⇒Автоплатеж
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("автоплат")} != null) 
+
+
+⇒Логин и пароль
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("логин")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("парол")} != null)) 
+&&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("кабинет")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сайт")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вход")} != null)|| 
+ (card.find{key, value -> key.startsWith("VOICE") && value.contains("банк")} != null)||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("предложен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("приложен")} != null))
+
+
+⇒Не приходит код
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("не приш")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не прис")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не прих")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("не отправ")} != null)) && 
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("парол")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("код")} != null))
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("ваучер")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("рупи")} != null)
+
+
+⇒Установка приложения
+
+
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("попасть")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("открыть")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("зайти")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вход")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("войти")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("установ")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("скач")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ссылк")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("закач")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подключ")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("обнов")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("айфо")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("айос")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ios")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мак")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("айпод")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("iphone")} != null)
+)
+&&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("прилож")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("предложен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мобильный банк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("личный кабинет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мтс банк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("интернет банк")} != null))
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("проблем")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("ошибк")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("не коррект")} != null) 
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("счет")} != null) 
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("оператор")} != null) 
+
+
+⇒Списания
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("списа")} != null) 
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null))
+||
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("списа")} != null) 
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("распис")} != null))
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("номер")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("бонус")} != null)
+&& 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("смс")} != null)
+
+
+⇒Пароль
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("парол")} != null)
+
+
+⇒МТС Pay
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мтс")} != null) &&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("пэй")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("пей")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("pay")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плей")} != null)) &&
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("юнион")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("union")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("юньон")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("ваучер")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("плейстей")} != null))
+
+
+⇒Подключить услуги
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подключ")} != null)
+&&
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("смс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сообще")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("услуг")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("уведом")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("оповещ")} != null)
+)
+
+
+
+⇒Оплата зарубежных сервисов
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("апекс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("апикс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("легендс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("легенс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("бравлстарс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("бравл старс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("фортнайт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("фортайн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("файр хэф")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("майнкрафт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("роблокс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("голд")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("паб")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вало ранд")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вало райнт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вэлорант")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("вэлорайнт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("разер")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("райзер")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("стим")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плейстейшн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плейстейшен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("плэстэйшен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("нетворк")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("батл нет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("икс бокс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("миро")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("нинтенд")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ешоп")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("эшоп")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("эрн би")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("эрнби")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("амазон")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("чатжипити")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("джи пяти")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("чат же пяти")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("чат гпт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("чат до пяти")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("джипити")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("чипити чат")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ибэй")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ебэй")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("миджен")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("миджио")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("нетфликс")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сэнд")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("тидал")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("твич")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("твитч")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("зум")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("клоуд")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("клауд")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("канва")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("майкрософт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("нэйшн")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("найтион")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("натион")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кэнва")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("твитч")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ваучер")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("игр")} != null)  ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("игровой")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("стриминг")} != null)) &&
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("играм")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("играю")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("играть")} != null))
+
+
+⇒Счет на оплату
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет на оплату")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("штраф")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счёт на оплату")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("гибдд")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ГИБДД")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("фссп")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ФССП")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("коммунал")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("жкх")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ЖКХ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("ЖКУ")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains(" жку ")} != null)|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("налог")} != null)
+
+
+⇒Потерял телефон, карту
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("терял")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("терян")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("украл")} != null)) 
+&&
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("телеф")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кошел")} != null))
+
+
+⇒Проверка открытых продуктов
+
+
+((
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("привяз")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("есть")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("какие")} != null)
+)
+&&
+(  
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("продукт")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("кредит")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("карт")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("услуг")} != null)
+)
+&&
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("меня")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мной")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("моё")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мое")} != null)
+))
+|| 
+((
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("сколько")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("есть")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("открыт")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("остались")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("узнать")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("имеются")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("подробности")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("количество")} != null)
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("откуда")} != null)
+)
+&&
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null)
+)
+&&
+(
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("меня")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мной")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("моё")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("банк")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("свой")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("своих")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("моих")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мое")} != null)
+|| 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("активный")} != null)
+))
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("шесть")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("денег")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("денеж")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("деньги")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("огран")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("опер")} != null)
+&&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("спец")} != null)
+&&
+(card["VOICE"].length()<150)
+
+
+
+юрент (CSDC-4644)
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("юрент")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("юррент")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("urent")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("самокат")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("велосипед")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("юрэнд")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("юренд")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("юрэнс")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("юранцы")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("павербанк")} != null) || 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("аренда")} != null))
+
+
+Рассрочка по КК
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("рассрочк")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("разрошка")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("расрочк")} != null))
+&&
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("реквиз")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("одобрен")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("магаз")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("помен")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("статус")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("заяв")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("договор")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("телефон")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("валберис")} != null) &&  
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("страх")} != null))
+
+
+⇒МТС Инвестиции
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("брокерск")} != null) && 
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("счет")} != null))
+||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("инвест")} != null)
+
+
+
+⇒Не приходят СМС
+
+
+(((card.find{key, value -> key.startsWith("VOICE") && value.contains("не приход")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("не поступ")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("не доход")} != null)) && ((card.find{key, value -> key.startsWith("VOICE") && value.contains("смс")} != null) || (card.find{key, value -> key.startsWith("VOICE") && value.contains("сообщен")} != null)))
+&&
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("каждый день")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("ошиб")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("задолж")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("друг")} != null))
+
+
+
+⇒eSIM
+
+
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("есим")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("еCим")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("е-Cим")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("eSIM")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("eСИМ")} != null)
+
+
+⇒Премиальное обслуживание
+
+
+((card.find{key, value -> key.startsWith("VOICE") && value.contains("премиал")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("премин")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("премиум")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("прайвет")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("приват")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("суприм")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("медси")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("мембрана")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("консьерж")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("такси")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("телемедицина")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("основы здоровья")} != null) ||
+(card.find{key, value -> key.startsWith("VOICE") && value.contains("пакет услуг")} != null)) &&
+((card.find{key, value -> key.startsWith("VOICE") && !value.contains("отключ")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("отказ")} != null) &&
+(card.find{key, value -> key.startsWith("VOICE") && !value.contains("отписат")} != null))
+
+
+
+
+
